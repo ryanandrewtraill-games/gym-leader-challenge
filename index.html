@@ -93,7 +93,7 @@
       <section class="panel">
         <h3 style="margin:0 0 8px 0">📊 Daily Stats</h3>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div style="background:#f6fbff;padding:8px;border-radius:8px"><small style="color:var(--muted)">Wins</small><div id="wins">0</div></div><div style="background:#fff6f6;padding:8px;border-radius:8px"><small style="color:var(--muted)">Losses</small><div id="losses">0</div></div></div>
-        <div style="margin-top:8px;color:var(--muted)" id="dailyStatus">Daily status: not played</div>
+        <div style="margin-top:8px;color:var(--muted)" id="dailyStatus">Testing mode: daily lock off</div>
       </section>
     </aside>
   </div>
@@ -114,99 +114,224 @@
 
     function saveState(){ localStorage.setItem(storageKeyTeam, JSON.stringify(chosen)); localStorage.setItem(storageKeyStats, JSON.stringify(stats)); localStorage.setItem(storageKeyDaily, JSON.stringify(daily)); }
 
-    function showStep(step){ ['teamBuilder','teamSummary','challengePanel','battlePanel','resultPanel'].forEach(id=>{const el=$(id); if(el) el.classList.toggle('step-hidden', !(step==='team' && id==='teamBuilder' || step==='challenge' && (id==='teamSummary'||id==='challengePanel') || step==='battle' && id==='battlePanel' || step==='result' && id==='resultPanel')) }) }
+    function showStep(step){
+      const visible = new Set();
+      if (step === 'team') visible.add('teamBuilder');
+      if (step === 'challenge') { visible.add('teamBuilder'); visible.add('challengePanel'); }
+      if (step === 'battle') visible.add('battlePanel');
+      if (step === 'result') visible.add('resultPanel');
+      ['teamBuilder','challengePanel','battlePanel','resultPanel'].forEach(id=>{
+        const el=$(id); if(el) el.classList.toggle('step-hidden', !visible.has(id));
+      });
+    }
 
-    function updateStatsUI(){ $('wins').textContent = stats.wins||0; $('losses').textContent = stats.losses||0; $('dailyStatus').textContent = (daily[today()]?('Daily: '+daily[today()].result):'Daily status: not played'); }
+    function updateStatsUI(){
+      $('wins').textContent = stats.wins||0;
+      $('losses').textContent = stats.losses||0;
+      $('dailyStatus').textContent = 'Testing mode: daily lock off';
+    }
 
     function maxHP(p){ return Math.max(20, Math.floor((2*(p.stats?.hp||50)+31+63)*100/100)+100+10) }
 
     async function getPokemon(idOrName){ if(detailCache[idOrName]) return detailCache[idOrName];
-      try{ const r=await fetch(API+'/pokemon/'+idOrName); if(!r.ok) throw 0; const p=await r.json(); const moves = p.moves.map(m=>m.move.name).slice(0,6); // we'll fetch move info lazily
-        const obj={id:p.id,name:p.name,sprite:p.sprites?.front_default||'',types:p.types.map(t=>t.type.name),stats:Object.fromEntries(p.stats.map(s=>[s.stat.name,s.base_stat])),moveNames:moves}; detailCache[p.id]=obj; detailCache[p.name]=obj; return obj }catch(e){throw e} }
+      try{ const r=await fetch(API+'/pokemon/'+idOrName); if(!r.ok) throw 0; const p=await r.json(); const moves = p.moves.map(m=>m.move.name).slice(0,6); const obj={id:p.id,name:p.name,sprite:p.sprites?.front_default||'',types:p.types.map(t=>t.type.name),stats:Object.fromEntries(p.stats.map(s=>[s.stat.name,s.base_stat])),moveNames:moves}; detailCache[p.id]=obj; detailCache[p.name]=obj; return obj }catch(e){ throw e } }
 
     async function moveInfo(name){ try{ const r=await fetch(API+'/move/'+name); if(!r.ok) throw 0; const m=await r.json(); return {name:m.name,power:m.power||40,type:m.type.name,accuracy:m.accuracy||100,damageClass:m.damage_class?.name||'physical'} }catch(e){ return {name, power:40, type:'normal', accuracy:100, damageClass:'physical'} } }
 
-    async function ensureMoves(p){ if(!p) return []; if(p.moves && p.moves.length) return p.moves; p.moves = [];
-      for(let i=0;i<Math.min(4,(p.moveNames||[]).length);i++){const name=p.moveNames[i]; const info = await moveInfo(name); p.moves.push(info)} if(p.moves.length===0) p.moves.push({name:'Struggle',power:50,type:'normal',accuracy:100,damageClass:'physical'}); return p.moves }
+    async function ensureMoves(p){
+      if(!p) return [];
+      if(p.moves && p.moves.length) return p.moves;
+      p.moves = [];
+      const names = (p.moveNames || []).slice(0,4);
+      for(const name of names){ p.moves.push(await moveInfo(name)); }
+      if(p.moves.length===0){ p.moves.push({name:'Struggle',power:50,type:'normal',accuracy:100,damageClass:'physical'}); }
+      return p.moves;
+    }
 
-    // Dex/search behavior: start empty and fetch on demand
-    async function searchPokemon(q){ if(!q) return; const term=q.trim().toLowerCase(); try{ $('dexGrid').innerHTML='<div style="grid-column:1/-1;padding:8px;color:var(--muted)">Searching…</div>'; const p = await getPokemon(term); renderSearchResults([p]); }catch(e){ $('dexGrid').innerHTML='<div style="grid-column:1/-1;padding:8px;color:var(--muted)">Not found</div>'; } }
+    async function searchPokemon(q){
+      if(!q || !q.trim()) return;
+      const term=q.trim().toLowerCase();
+      try{
+        $('dexGrid').innerHTML='<div style="grid-column:1/-1;padding:8px;color:var(--muted)">Searching…</div>';
+        const p = await getPokemon(term);
+        renderSearchResults([p]);
+      }catch(e){
+        $('dexGrid').innerHTML='<div style="grid-column:1/-1;padding:8px;color:var(--muted)">Not found</div>';
+      }
+    }
 
-    function renderSearchResults(list){ $('dexGrid').innerHTML = list.map(p=>`<div class="dex-entry ${chosen.includes(p.id)?'selected':''}" data-id="${p.id}"><img src="${p.sprite||''}" alt="${p.name}" style="width:64px;height:64px"><div style="text-transform:capitalize">${p.name}</div><small>#${p.id}</small></div>`).join('') }
+    function renderSearchResults(list){
+      $('dexGrid').innerHTML = list.map(p=>`<div class="dex-entry ${chosen.includes(p.id)?'selected':''}" data-id="${p.id}"><img src="${p.sprite||''}" alt="${p.name}" style="width:64px;height:64px"><div style="text-transform:capitalize">${p.name}</div><small>#${p.id}</small></div>`).join('');
+    }
 
-    function renderSelected(){ const team = Array.from({length:6},(_,i)=>detailCache[chosen[i]]||null); $('teamCards').innerHTML = team.map(p=>p?`<div class="dex-entry selected" data-id="${p.id}"><img src="${p.sprite||''}" style="width:64px;height:64px"><div style="text-transform:capitalize">${p.name}</div><small>#${p.id}</small></div>`:'<div class="dex-entry" style="opacity:.6">Empty</div>').join(''); $('continueBtn').disabled = chosen.length!==6 }
+    function renderSelected(){
+      const team = Array.from({length:6},(_,i)=>detailCache[chosen[i]]||null);
+      $('teamCards').innerHTML = team.map(p=>p?`<div class="dex-entry selected" data-id="${p.id}"><img src="${p.sprite||''}" style="width:64px;height:64px"><div style="text-transform:capitalize">${p.name}</div><small>#${p.id}</small></div>`:'<div class="dex-entry" style="opacity:.6">Empty</div>').join('');
+      $('continueBtn').disabled = chosen.length!==6;
+      $('teamNote').textContent = chosen.length===6 ? 'Your team is ready.' : 'Pick 6 Pokémon for your Gym.';
+    }
 
     document.addEventListener('click', async e=>{
-      const slot = e.target.closest('.dex-entry'); if(!slot) return; const id=slot.dataset.id; if(!id) return; // toggle selection
-      const parsed = Number(id)||id;
-      if(chosen.includes(Number(id))){ chosen = chosen.filter(x=>x!==Number(id)) } else if(chosen.length<6) { chosen.push(Number(id)) }
-      saveState(); renderSearchResults(Object.values(detailCache).filter((v,i,a)=>a.indexOf(v)===i)); renderSelected();
-    })
+      const slot = e.target.closest('.dex-entry');
+      if(!slot) return;
+      const id=Number(slot.dataset.id);
+      if(!id) return;
+      if(chosen.includes(id)) chosen = chosen.filter(x=>x!==id); else if(chosen.length<6) chosen.push(id);
+      saveState();
+      renderSelected();
+      if($('dexGrid').innerHTML.includes('Searching') || $('dexGrid').innerHTML.includes('Not found') || $('dexGrid').innerHTML.includes('Pick 6 Pokémon')){ /* keep results stable for a moment */ }
+      if(detailCache[id]) renderSearchResults(Object.values(detailCache).filter(Boolean));
+    });
 
     $('dexSearchBtn').addEventListener('click', ()=>searchPokemon($('dexSearch').value));
     $('dexSearch').addEventListener('keydown', e=>{ if(e.key==='Enter') searchPokemon($('dexSearch').value) })
-    $('clearDexBtn').addEventListener('click', ()=>{ $('dexGrid').innerHTML='<div style="grid-column:1/-1;color:var(--muted);padding:12px">Search for a Pokémon by name or ID to add it to the picker. The list starts empty.</div>' })
+    $('clearDexBtn').addEventListener('click', ()=>{ $('dexGrid').innerHTML='<div style="grid-column:1/-1;color:var(--muted);padding:12px">Search for a Pokémon by name or ID to add it to the picker. The list starts empty.</div>'; });
 
-    // Challenge: pick daily challenge (deterministic) and ensure pokemon loaded
-    async function makeChallenge(){ const seed = Number(today().replace(/-/g,'')); const pool=[1,4,7,25,26,94,131,143,149,150,246,248,382,445,448,460]; const idx = Math.abs(Math.floor(seed*17+839))%pool.length; const trainer=['Blue','Red','Lance','Leaf','Giovanni','Steven'][Math.abs(Math.floor(seed/11))%6]; const ids = [pool[idx], pool[(idx+1)%pool.length], pool[(idx+2)%pool.length]]; challenge = {trainer, ids}; // ensure details
-      try{ const loaded = await Promise.all(ids.map(id=>getPokemon(id))); // store
-        $('challengeInfo').textContent = trainer + ' is challenging your Gym.'; renderChallengePreview(); }catch(e){ $('challengeInfo').textContent = 'Unable to load challenge data. Try reloading.'; }
+    async function makeChallenge(){
+      const seed = Number(today().replace(/-/g,''));
+      const pool=[1,4,7,25,26,94,131,143,149,150,246,248,382,445,448,460];
+      const idx = Math.abs(Math.floor(seed*17+839))%pool.length;
+      const trainer=['Blue','Red','Lance','Leaf','Giovanni','Steven'][Math.abs(Math.floor(seed/11))%6];
+      challenge = {trainer, ids:[pool[idx], pool[(idx+1)%pool.length], pool[(idx+2)%pool.length]]};
+      $('challengeInfo').textContent = trainer + ' is challenging your Gym.';
+      renderChallengePreview();
     }
 
-    function renderChallengePreview(){ if(!challenge) return; $('previewEnemy').innerHTML = challenge.ids.map(id=>{ const p = detailCache[id]; if(!p) return '<div style="opacity:.6">Loading…</div>'; return `<div class="dex-entry"><img src="${p.sprite||''}" style="width:64px;height:64px"><div style="text-transform:capitalize">${p.name}</div><small>#${p.id}</small></div>` }).join('') }
+    function renderChallengePreview(){
+      if(!challenge) return;
+      $('previewEnemy').innerHTML = challenge.ids.map(id=>{
+        const p = detailCache[id];
+        if(!p) return '<div style="opacity:.6">Loading…</div>';
+        return `<div class="dex-entry"><img src="${p.sprite||''}" style="width:64px;height:64px"><div style="text-transform:capitalize">${p.name}</div><small>#${p.id}</small></div>`;
+      }).join('');
+    }
 
-    // Battle helpers
     function setHpFill(el, fraction){ el.style.width = Math.max(0, Math.min(100, Math.round(fraction*100))) + '%' }
 
-    function damageCalc(att, def, mv){ const power = mv.power || 40; const atkStat = (att.stats && (mv.damageClass==='special'?att.stats['special-attack']:att.stats['attack']))||50; const defStat = (def.stats && (mv.damageClass==='special'?def.stats['special-defense']:def.stats['defense']))||50; const base = Math.max(1, Math.floor(power * (atkStat/defStat))); return base }
+    function damageCalc(att, def, mv){
+      const power = mv.power || 40;
+      const atkStat = (mv.damageClass === 'special' ? (att.stats?.['special-attack'] ?? 50) : (att.stats?.attack ?? 50));
+      const defStat = (mv.damageClass === 'special' ? (def.stats?.['special-defense'] ?? 50) : (def.stats?.defense ?? 50));
+      return Math.max(8, Math.floor(power * (atkStat / Math.max(10, defStat)))) + 4;
+    }
 
-    function createDamageFx(text, x, y){ const el = document.createElement('div'); el.className='damage-fx'; el.textContent = text; document.body.appendChild(el); el.style.left = x+'px'; el.style.top = y+'px'; setTimeout(()=>el.remove(),900); }
+    function createDamageFx(text, x, y){
+      const el=document.createElement('div');
+      el.className='damage-fx'; el.textContent=text; document.body.appendChild(el);
+      el.style.left=x+'px'; el.style.top=y+'px';
+      setTimeout(()=>el.remove(),900);
+    }
 
-    function animateMove(attEl, defEl){ return new Promise(res=>{ if(!attEl||!defEl){ setTimeout(res,300); return } attEl.classList.add('anim-forward'); setTimeout(()=>{ attEl.classList.remove('anim-forward'); defEl.classList.add('anim-shake'); setTimeout(()=>{ defEl.classList.remove('anim-shake'); res() },300) },320) }) }
+    function animateMove(attEl, defEl){ return new Promise(res=>{ if(!attEl || !defEl){ setTimeout(res,200); return; } attEl.classList.add('anim-forward'); setTimeout(()=>{ attEl.classList.remove('anim-forward'); defEl.classList.add('anim-shake'); setTimeout(()=>{ defEl.classList.remove('anim-shake'); res(); },300); },320); }) }
 
-    async function startBattle(){ if(chosen.length!==6) return alert('Pick 6 Pokémon first'); if(daily[today()]) return alert('You already played today'); // prepare teams
-      const myTeam = chosen.map(id=>detailCache[id]).map(p=>({p, currentHp: maxHP(p)})); const foeTeam = (challenge?challenge.ids.map(id=>detailCache[id]).filter(Boolean):[]).map(p=>({p, currentHp: maxHP(p)})); // ensure moves
-      for(const m of myTeam) await ensureMoves(m.p); for(const e of foeTeam) await ensureMoves(e.p);
-      battle = {player:myTeam, enemy:foeTeam, pi:0, ei:0, turn:1}; if(battle.enemy.length===0){ alert('Enemy team missing — cannot start'); return }
-      $('battleLog').textContent='The battle begins!'; updateBattleDisplay(); showStep('battle'); }
+    async function startBattle(){
+      if(chosen.length!==6) return alert('Pick 6 Pokémon first');
+      const myTeam = chosen.map(id => detailCache[id]).filter(Boolean).map(p => ({p, currentHp: maxHP(p)}));
+      const foeTeam = (challenge ? challenge.ids.map(id => detailCache[id]).filter(Boolean) : []).map(p => ({p, currentHp: maxHP(p)}));
+      if(!myTeam.length || !foeTeam.length) return alert('Challenge team not ready. Try again.');
+      for(const x of myTeam) await ensureMoves(x.p);
+      for(const x of foeTeam) await ensureMoves(x.p);
+      battle = {player:myTeam, enemy:foeTeam, pi:0, ei:0};
+      $('battleLog').textContent='The battle begins!';
+      updateBattleDisplay();
+      showStep('battle');
+    }
 
-    function updateBattleDisplay(){ if(!battle) return; const me = battle.player[battle.pi]; const foe = battle.enemy[battle.ei]; $('mySprite').src = me.p.sprite || ''; $('foeSprite').src = foe.p.sprite || ''; $('myName').textContent = me.p.name || ''; $('foeName').textContent = foe.p.name || ''; setHpFill($('myHpFill'), me.currentHp / maxHP(me.p)); setHpFill($('foeHpFill'), foe.currentHp / maxHP(foe.p)); // moves
-      const moves = (me.p.moves||[]).slice(0,4); $('moveButtons').innerHTML = moves.map((mv,i)=>`<button class="move-btn" data-move="${i}">${mv.name.replace('-',' ')}</button>`).join(''); }
+    function updateBattleDisplay(){
+      if(!battle) return;
+      const me = battle.player[battle.pi];
+      const foe = battle.enemy[battle.ei];
+      if(!me || !foe) return;
+      $('mySprite').src = me.p.sprite || '';
+      $('foeSprite').src = foe.p.sprite || '';
+      $('myName').textContent = me.p.name || '';
+      $('foeName').textContent = foe.p.name || '';
+      setHpFill($('myHpFill'), me.currentHp / maxHP(me.p));
+      setHpFill($('foeHpFill'), foe.currentHp / maxHP(foe.p));
+      const moves = (me.p.moves || []).slice(0,4);
+      $('moveButtons').innerHTML = moves.map((mv,i)=>`<button class="move-btn" data-move="${i}">${(mv.name || 'Tackle').replace(/-/g,' ')}</button>`).join('');
+    }
 
-    // handle player move clicks
-    document.addEventListener('click', async e=>{ const mvBtn = e.target.closest('[data-move]'); if(!mvBtn||!battle||moveLock) return; moveLock=true; const idx=Number(mvBtn.dataset.move); const me = battle.player[battle.pi]; const foe = battle.enemy[battle.ei]; const mv = (me.p.moves||[])[idx] || {name:'Tackle',power:40,damageClass:'physical'}; // animate
-      await animateMove($( 'mySprite'), $('foeSprite'));
-      const dmg = damageCalc(me.p, foe.p, mv); foe.currentHp = Math.max(0, foe.currentHp - dmg); // show damage
-      const rect = $('foeSprite').getBoundingClientRect(); createDamageFx('-'+dmg, rect.left+rect.width/2, rect.top+20);
-      setHpFill($('foeHpFill'), foe.currentHp / maxHP(foe.p)); $('battleLog').textContent = `${me.p.name} used ${mv.name}! It dealt ${dmg} damage.`;
-      await new Promise(r=>setTimeout(r,450));
-      if(foe.currentHp<=0){ // faint
-        $('battleLog').textContent += `\n${foe.p.name} fainted!`;
-        $('foeSprite').classList.add('faint'); await new Promise(r=>setTimeout(r,650)); battle.ei++;
-        if(battle.ei >= battle.enemy.length){ finishBattle(true); moveLock=false; return } else { $('foeSprite').classList.remove('faint'); updateBattleDisplay(); }
+    function finishBattle(win){
+      stats.played = (stats.played||0) + 1;
+      if(win){ stats.wins=(stats.wins||0)+1; stats.streak=(stats.streak||0)+1; }
+      else { stats.losses=(stats.losses||0)+1; stats.streak=0; }
+      saveState();
+      updateStatsUI();
+      $('resultSummary').textContent = win ? 'You defended your gym and won the challenge!' : 'The challenger got the better of you this time.';
+      showStep('result');
+    }
+
+    document.addEventListener('click', async e=>{
+      const mvBtn = e.target.closest('[data-move]');
+      if(!mvBtn || !battle || moveLock) return;
+      moveLock = true;
+      const idx = Number(mvBtn.dataset.move);
+      const me = battle.player[battle.pi];
+      const foe = battle.enemy[battle.ei];
+      if(!me || !foe){ moveLock=false; return; }
+      const mv = (me.p.moves || [])[idx] || {name:'Tackle', power:40, damageClass:'physical'};
+      await animateMove($('mySprite'), $('foeSprite'));
+      const dmg = damageCalc(me.p, foe.p, mv);
+      foe.currentHp = Math.max(0, foe.currentHp - dmg);
+      const rect = $('foeSprite').getBoundingClientRect();
+      createDamageFx('-'+dmg, rect.left + rect.width/2, rect.top + 20);
+      setHpFill($('foeHpFill'), foe.currentHp / maxHP(foe.p));
+      $('battleLog').textContent = `${me.p.name} used ${mv.name}! It dealt ${dmg} damage.`;
+      if(foe.currentHp <= 0){
+        $('foeSprite').classList.add('faint');
+        await new Promise(r => setTimeout(r, 500));
+        battle.ei += 1;
+        if(battle.ei >= battle.enemy.length){
+          finishBattle(true);
+          moveLock=false;
+          return;
+        }
+        $('foeSprite').classList.remove('faint');
+        updateBattleDisplay();
       }
-      // enemy turn
-      await new Promise(r=>setTimeout(r,250)); const foeMove = (foe.p.moves && foe.p.moves[Math.floor(Math.random()*(foe.p.moves.length||1))])||{name:'Tackle',power:40,damageClass:'physical'};
+
+      await new Promise(r => setTimeout(r, 200));
+      const foeMove = (foe.p.moves || [])[Math.floor(Math.random() * (foe.p.moves || []).length)] || {name:'Tackle', power:40, damageClass:'physical'};
       await animateMove($('foeSprite'), $('mySprite'));
-      const dmg2 = damageCalc(foe.p, me.p, foeMove); me.currentHp = Math.max(0, me.currentHp - dmg2); const rect2 = $('mySprite').getBoundingClientRect(); createDamageFx('-'+dmg2, rect2.left+rect2.width/2, rect2.top+20);
-      setHpFill($('myHpFill'), me.currentHp / maxHP(me.p)); $('battleLog').textContent += `\n${foe.p.name} used ${foeMove.name}! It dealt ${dmg2} damage.`;
-      await new Promise(r=>setTimeout(r,450)); if(me.currentHp<=0){ $('battleLog').textContent += `\n${me.p.name} fainted!`; $('mySprite').classList.add('faint'); await new Promise(r=>setTimeout(r,650)); battle.pi++; if(battle.pi >= battle.player.length){ finishBattle(false); moveLock=false; return } else { $('mySprite').classList.remove('faint'); updateBattleDisplay(); } }
-      moveLock=false;
-    })
+      const dmg2 = damageCalc(foe.p, me.p, foeMove);
+      me.currentHp = Math.max(0, me.currentHp - dmg2);
+      const rect2 = $('mySprite').getBoundingClientRect();
+      createDamageFx('-'+dmg2, rect2.left + rect2.width/2, rect2.top + 20);
+      setHpFill($('myHpFill'), me.currentHp / maxHP(me.p));
+      $('battleLog').textContent += `\n${foe.p.name} used ${foeMove.name}! It dealt ${dmg2} damage.`;
+      if(me.currentHp <= 0){
+        $('mySprite').classList.add('faint');
+        await new Promise(r => setTimeout(r, 500));
+        battle.pi += 1;
+        if(battle.pi >= battle.player.length){
+          finishBattle(false);
+          moveLock=false;
+          return;
+        }
+        $('mySprite').classList.remove('faint');
+        updateBattleDisplay();
+      }
+      moveLock = false;
+    });
 
-    function finishBattle(win){ daily[today()]={result:win?'win':'loss'}; stats.played=(stats.played||0)+1; if(win){ stats.wins=(stats.wins||0)+1; stats.streak=(stats.streak||0)+1 } else { stats.losses=(stats.losses||0)+1; stats.streak=0 } saveState(); updateStatsUI(); $('resultSummary').textContent = win? 'You defended your gym!':'You lost. Try again tomorrow.'; showStep('result'); }
+    function tick(){ const n=new Date(), end=new Date(n); end.setHours(24,0,0,0); const s=Math.max(0,Math.floor((end-n)/1000)); $('countdown').textContent = [Math.floor(s/3600),Math.floor(s%3600/60),s%60].map(v=>String(v).padStart(2,'0')).join(':'); }
 
-    // buttons
-    $('continueBtn').addEventListener('click', ()=>{ if(chosen.length!==6) return alert('Choose 6!'); makeChallenge().then(()=>showStep('challenge')); })
-    $('startBtn').addEventListener('click', ()=>startBattle())
-    $('backToTeamBtn').addEventListener('click', ()=>showStep('team'))
-    $('newChallengeBtn').addEventListener('click', ()=>{ makeChallenge(); showStep('challenge'); })
+    $('continueBtn').addEventListener('click', async ()=>{ if(chosen.length!==6) return alert('Choose 6 Pokémon first'); await makeChallenge(); showStep('challenge'); });
+    $('startBtn').addEventListener('click', ()=>startBattle());
+    $('backToTeamBtn').addEventListener('click', ()=>showStep('team'));
+    $('newChallengeBtn').addEventListener('click', async ()=>{ await makeChallenge(); showStep('challenge'); });
 
-    // time
-    function tick(){ const n=new Date(), end=new Date(n); end.setHours(24,0,0,0); const s=Math.max(0,Math.floor((end-n)/1000)); $('countdown').textContent = [Math.floor(s/3600),Math.floor(s%3600/60),s%60].map(v=>String(v).padStart(2,'0')).join(':') }
-
-    // init
-    (function init(){ chosen = Array.isArray(chosen)?chosen.slice(0,6):[]; stats = {...defaultStats,...stats}; daily = daily && typeof daily==='object'?daily:{}; updateStatsUI(); renderSelected(); makeChallenge(); tick(); setInterval(tick,1000); })();
+    (function init(){
+      chosen = Array.isArray(chosen) ? chosen.slice(0,6) : [];
+      stats = {...defaultStats, ...stats};
+      daily = daily && typeof daily === 'object' ? daily : {};
+      updateStatsUI();
+      renderSelected();
+      makeChallenge();
+      tick();
+      setInterval(tick,1000);
+    })();
   </script>
 </body>
 </html>
