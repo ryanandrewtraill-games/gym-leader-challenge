@@ -5,826 +5,208 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Gym Leader Challenge</title>
   <style>
-    :root {
-      --navy: #142b3d;
-      --navy2: #203d52;
-      --ink: #152d40;
-      --muted: #627b90;
-      --paper: #f2f7fb;
-      --line: #cbdbe8;
-      --blue: #3279bc;
-      --green: #25a878;
-      --red: #e45a62;
-      --gold: #efbd49;
-    }
-
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: linear-gradient(180deg, #eff7ff 0%, #ddeaf7 100%);
-      color: var(--ink);
-    }
-
-    .top {
-      background: var(--navy);
-      color: white;
-      padding: 18px 28px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.12);
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .ball {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      display: grid;
-      place-items: center;
-      background: radial-gradient(circle at 35% 30%, #fff 0 15%, #ff5a5a 15% 65%, #b30d16 100%);
-      box-shadow: inset -6px -4px 0 rgba(0,0,0,0.15);
-      font-size: 24px;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: clamp(1.4rem, 2vw, 2rem);
-    }
-
-    .subtitle {
-      margin: 4px 0 0;
-      color: rgba(255,255,255,0.8);
-      font-size: 0.9rem;
-    }
-
-    .countdown {
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 999px;
-      padding: 10px 14px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-    }
-
-    .wrap {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 320px;
-      gap: 18px;
-      max-width: 1280px;
-      margin: 18px auto;
-      padding: 0 16px 32px;
-    }
-
-    main {
-      min-width: 0;
-    }
-
-    .sidebar {
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-    }
-
-    .panel {
-      background: rgba(255,255,255,0.9);
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      padding: 16px;
-      box-shadow: 0 8px 18px rgba(31, 56, 78, 0.08);
-    }
-
-    .stepbar {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0,1fr));
-      gap: 8px;
-      margin-bottom: 16px;
-      font-size: 0.8rem;
-      color: var(--muted);
-      font-weight: 700;
-    }
-
-    .stepbar span {
-      display: block;
-      text-align: center;
-      padding: 8px 6px;
-      border-radius: 999px;
-      background: #edf3fa;
-      border: 1px solid transparent;
-    }
-
-    .stepbar .active {
-      background: var(--navy);
-      color: white;
-    }
-
-    .step-hidden {
-      display: none;
-    }
-
-    .heading {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 12px;
-    }
-
-    .heading h2 {
-      margin: 0;
-      font-size: 1.1rem;
-    }
-
-    .sub {
-      margin-top: 4px;
-      font-size: 0.78rem;
-      color: var(--muted);
-    }
-
-    button {
-      border: 0;
-      border-radius: 12px;
-      padding: 10px 14px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: transform 0.12s ease, opacity 0.2s ease;
-    }
-
-    button:hover:not(:disabled) { transform: translateY(-1px); }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    .primary {
-      background: var(--blue);
-      color: white;
-    }
-
-    .secondary {
-      background: #eaf0f7;
-      color: var(--ink);
-      border: 1px solid var(--line);
-    }
-
-    .danger {
-      background: var(--red);
-      color: white;
-    }
-
-    .team-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0,1fr));
-      gap: 12px;
-    }
-
-    .poke-card, .mini-card {
-      background: linear-gradient(180deg, #f9fbff 0%, #edf2f9 100%);
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 10px;
-      text-align: center;
-      min-height: 110px;
-    }
-
-    .poke-card img, .mini-card img {
-      width: 64px;
-      height: 64px;
-      object-fit: contain;
-      display: block;
-      margin: 0 auto 8px;
-    }
-
-    .poke-card strong, .mini-card strong {
-      display: block;
-      font-size: 0.8rem;
-      text-transform: capitalize;
-    }
-
-    .type-row {
-      display: flex;
-      justify-content: center;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-top: 6px;
-    }
-
-    .type-badge {
-      font-size: 0.68rem;
-      padding: 3px 7px;
-      border-radius: 999px;
-      color: white;
-      text-transform: capitalize;
-    }
-
-    .dex-tools {
-      display: flex;
-      gap: 10px;
-      margin: 18px 0 12px;
-      flex-wrap: wrap;
-    }
-
-    .dex-tools input, .dex-tools select {
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 10px 12px;
-      font-size: 0.95rem;
-      min-height: 42px;
-      background: white;
-    }
-
-    .dex-tools input { flex: 1 1 240px; }
-
-    .dex-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 10px;
-      max-height: 540px;
-      overflow: auto;
-      padding-right: 6px;
-    }
-
-    .dex-entry {
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      background: white;
-      padding: 8px;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color 0.08s ease, box-shadow 0.08s ease;
-    }
-
-    .dex-entry:hover {
-      border-color: var(--blue);
-      box-shadow: 0 6px 12px rgba(50,121,188,.15);
-    }
-
-    .dex-entry.selected {
-      border-color: var(--green);
-      background: #ecfbf4;
-    }
-
-    .dex-entry img {
-      width: 54px;
-      height: 54px;
-      object-fit: contain;
-      display: block;
-      margin: 0 auto 6px;
-    }
-
-    .dex-entry small {
-      display: block;
-      color: var(--muted);
-    }
-
-    .statgrid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0,1fr));
-      gap: 10px;
-    }
-
-    .stat {
-      background: #edf4fa;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 10px 12px;
-      text-align: center;
-    }
-
-    .stat small {
-      display: block;
-      font-size: 0.72rem;
-      color: var(--muted);
-      margin-bottom: 4px;
-    }
-
-    .stat strong {
-      font-size: 1.5rem;
-    }
-
-    .battle-box {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      margin-top: 16px;
-      align-items: center;
-    }
-
-    .battle-pokemon {
-      text-align: center;
-      padding: 18px 12px;
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      background: linear-gradient(180deg,#f8fcff,#edf3fa);
-    }
-
-    .battle-pokemon img {
-      width: 116px;
-      height: 116px;
-      object-fit: contain;
-      filter: drop-shadow(0 10px 10px rgba(0,0,0,0.12));
-    }
-
-    .battle-log {
-      margin-top: 16px;
-      min-height: 90px;
-      background: #f3f7fb;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 12px;
-      white-space: pre-line;
-      line-height: 1.5;
-    }
-
-    .moves {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 16px;
-    }
-
-    .move-btn {
-      background: #eff5ff;
-      border: 1px solid var(--line);
-      color: var(--ink);
-      font-size: 0.82rem;
-    }
-
-    .empty-slot {
-      display: grid;
-      place-items: center;
-      border: 1px dashed var(--line);
-      border-radius: 14px;
-      background: rgba(220,230,240,0.35);
-      color: var(--muted);
-      min-height: 120px;
-    }
-
-    @media (max-width: 900px) {
-      .wrap { grid-template-columns: 1fr; }
-      .team-grid { grid-template-columns: repeat(2, 1fr); }
-    }
-
-    @media (max-width: 560px) {
-      .top { flex-direction: column; align-items: flex-start; gap: 12px; }
-      .team-grid, .battle-box { grid-template-columns: 1fr; }
-      .stepbar { grid-template-columns: repeat(2, minmax(0,1fr)); }
-    }
+    :root{--navy:#142b3d;--blue:#3279bc;--green:#25a878;--line:#cbdbe8;--muted:#627b90;--ink:#152d40}
+    *{box-sizing:border-box}body{margin:0;font-family:Arial,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue';background:linear-gradient(180deg,#eff7ff 0%,#ddeaf7 100%);color:var(--ink)}
+    .top{background:var(--navy);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center}
+    .brand{display:flex;gap:12px;align-items:center}
+    .ball{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 30%,#fff 0 15%,#ff5a5a 15% 65%,#b30d16 100%);font-size:22px}
+    .wrap{max-width:1100px;margin:18px auto;display:grid;grid-template-columns:1fr 320px;gap:16px;padding:0 12px}
+    main{min-width:0}.panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px}
+    .step-hidden{display:none}
+    .dex-tools{display:flex;gap:8px;margin:10px 0}
+    .dex-tools input,.dex-tools select,.dex-tools button{padding:8px;border:1px solid var(--line);border-radius:8px}
+    .dex-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;max-height:420px;overflow:auto;padding:6px}
+    .dex-entry{border:1px solid var(--line);border-radius:10px;padding:8px;text-align:center;cursor:pointer;background:#fff}
+    .dex-entry.selected{background:#ecfbf4;border-color:var(--green)}
+    .poke-card img{width:64px;height:64px;object-fit:contain}
+    .battle-stage{display:flex;gap:12px;align-items:center;justify-content:space-between;position:relative}
+    .side{width:48%;text-align:center}
+    .sprite-wrap{height:160px;display:flex;align-items:center;justify-content:center}
+    .sprite{width:140px;height:140px;object-fit:contain;transition:transform .25s ease}
+    .hp-bar{height:12px;background:#efefef;border-radius:999px;overflow:hidden;margin-top:6px}
+    .hp-fill{height:100%;background:linear-gradient(90deg,#76e2a9,#25a878);width:100%;transition:width .6s ease}
+    .battle-log{margin-top:12px;background:#f6fbff;padding:8px;border-radius:8px;min-height:76px;white-space:pre-line}
+    .moves{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .move-btn{padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:#eff5ff;cursor:pointer}
+    .anim-forward{transform:translateX(10px) scale(1.03)}
+    .anim-shake{animation:shake .28s}
+    @keyframes shake{0%{transform:translateX(0)}25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-3px)}100%{transform:translateX(0)}}
+    .damage-fx{position:absolute;pointer-events:none;font-weight:700;color:#ff4d4d;text-shadow:0 1px 0 #fff;animation:floatUp .9s ease forwards}
+    @keyframes floatUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-36px)}}
+    .faint{opacity:0;transform:translateY(12px);transition:opacity .6s ease,transform .6s ease}
+    .controls{display:flex;gap:8px}
+    @media(max-width:900px){.wrap{grid-template-columns:1fr}.side{width:100%}}
   </style>
 </head>
 <body>
   <header class="top">
-    <div class="brand">
-      <div class="ball">🔴</div>
-      <div>
-        <h1>Gym Leader Challenge</h1>
-        <p class="subtitle">Pick your six. Defend your Gym. Face a new challenger every day.</p>
-      </div>
-    </div>
-    <div class="countdown" id="countdown">--:--:--</div>
+    <div class="brand"><div class="ball">🔴</div><div><h1 style="margin:0;font-size:1.2rem">Gym Leader Challenge</h1><div style="color:#dfeaf7;font-size:0.9rem">Pick your six. Defend your Gym. Face a new challenger every day.</div></div></div>
+    <div id="countdown">--:--:--</div>
   </header>
-
   <div class="wrap">
     <main>
-      <section class="panel step-hidden" id="teamSummary">
-        <div class="heading">
-          <div>
-            <h2>👑 Your Gym Team</h2>
-            <div class="sub">Choose six Pokémon · Level 100 · Generations I–III only</div>
-          </div>
-          <button class="secondary" id="editTeamBtn" type="button">Edit team</button>
+      <section class="panel" id="teamBuilder">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div><h2 style="margin:0">🧩 Team Builder</h2><div id="teamNote" style="color:var(--muted)">Pick 6 Pokémon for your Gym.</div></div><div class="controls"><button id="continueBtn" class="primary" disabled style="background:var(--blue);color:#fff;border-radius:8px;padding:8px 10px">Continue</button></div></div>
+
+        <div class="dex-tools">
+          <input id="dexSearch" placeholder="Type name or ID and press Enter or Search" aria-label="Search">
+          <select id="genFilter"><option value="all">All gens</option><option value="1">Gen I</option><option value="2">Gen II</option><option value="3">Gen III</option></select>
+          <button id="dexSearchBtn">Search</button>
+          <button id="clearDexBtn">Clear</button>
         </div>
-        <div class="team-grid" id="teamCards"></div>
+        <div id="dexGrid" class="dex-grid"><div style="grid-column:1/-1;color:var(--muted);padding:12px">Search for a Pokémon by name or ID to add it to the picker. The list starts empty.</div></div>
+        <div style="margin-top:12px"><h3 style="margin:6px 0">Selected team</h3><div id="teamCards" class="dex-grid" style="grid-template-columns:repeat(3,1fr)"></div></div>
       </section>
 
       <section class="panel step-hidden" id="challengePanel">
-        <div class="heading">
-          <div>
-            <h2>⚔️ Challenger</h2>
-            <div class="sub" id="challengeInfo">Your daily challenge is ready.</div>
-          </div>
-          <button class="primary" id="startBtn" type="button">Start battle</button>
-        </div>
-        <div id="previewEnemy" class="team-grid"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h2 style="margin:0">⚔️ Challenger</h2><div><button id="startBtn" class="primary" style="background:var(--blue);color:#fff;border-radius:8px;padding:8px 10px">Start battle</button></div></div>
+        <div id="challengeInfo" style="color:var(--muted);margin-bottom:8px">Your daily challenge is ready.</div>
+        <div id="previewEnemy" class="dex-grid"></div>
       </section>
 
       <section class="panel step-hidden" id="battlePanel">
-        <div class="heading">
-          <div>
-            <h2>🥊 Battle</h2>
-            <div class="sub" id="battleStatus">Battle in progress</div>
-          </div>
-        </div>
-        <div class="battle-box">
-          <div class="battle-pokemon">
-            <img id="mySprite" alt="Your Pokémon" src="">
+        <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">🥊 Battle</h2><div id="battleRound" style="color:var(--muted)"></div></div>
+        <div class="battle-stage" style="margin-top:12px;position:relative">
+          <div class="side">
+            <div class="sprite-wrap"><img id="mySprite" class="sprite" src="" alt=""></div>
             <div id="myName"></div>
+            <div class="hp-bar"><div id="myHpFill" class="hp-fill" style="width:100%"></div></div>
           </div>
-          <div class="battle-pokemon">
-            <img id="foeSprite" alt="Opponent Pokémon" src="">
+          <div class="side">
+            <div class="sprite-wrap"><img id="foeSprite" class="sprite" src="" alt=""></div>
             <div id="foeName"></div>
+            <div class="hp-bar"><div id="foeHpFill" class="hp-fill" style="width:100%"></div></div>
           </div>
         </div>
         <div class="moves" id="moveButtons"></div>
-        <div class="battle-log" id="battleLog"></div>
+        <div class="battle-log" id="battleLog">Battle log will appear here.</div>
       </section>
 
       <section class="panel step-hidden" id="resultPanel">
-        <div class="heading">
-          <div>
-            <h2>🏆 Results</h2>
-            <div class="sub" id="resultTitle">Battle complete.</div>
-          </div>
-        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">🏆 Results</h2><div></div></div>
         <div id="resultSummary" class="battle-log"></div>
-        <div class="moves" style="margin-top: 14px;">
-          <button class="primary" id="newChallengeBtn" type="button">Play again</button>
-          <button class="secondary" id="backToTeamBtn" type="button">Back to team</button>
-        </div>
-      </section>
-
-      <section class="panel" id="teamBuilder">
-        <div class="stepbar">
-          <span class="active">1 · Choose team</span>
-          <span>2 · Challenger</span>
-          <span>3 · Battle</span>
-          <span>4 · Results</span>
-        </div>
-        <div class="heading">
-          <div>
-            <h2>🧩 Team Builder</h2>
-            <div class="sub" id="teamNote">Pick 6 Pokémon for your Gym.</div>
-          </div>
-          <button class="primary" id="continueBtn" type="button">Continue</button>
-        </div>
-
-        <div class="dex-tools">
-          <input id="dexSearch" type="search" placeholder="Search Pokemon or ID" aria-label="Search Pokemon">
-          <select id="genFilter" aria-label="Generation filter">
-            <option value="all">All generations</option>
-            <option value="1">Gen I</option>
-            <option value="2">Gen II</option>
-            <option value="3">Gen III</option>
-          </select>
-        </div>
-
-        <div class="dex-grid" id="dexGrid"></div>
+        <div style="margin-top:8px" class="controls"><button id="newChallengeBtn" class="primary" style="background:var(--blue);color:#fff;padding:8px;border-radius:8px">Play again</button><button id="backToTeamBtn" class="secondary" style="padding:8px;border-radius:8px">Back to team</button></div>
       </section>
     </main>
 
-    <aside class="sidebar">
+    <aside>
       <section class="panel">
-        <div class="heading">
-          <h2>📊 Daily Stats</h2>
-        </div>
-        <div class="statgrid">
-          <div class="stat">
-            <small>Wins</small>
-            <strong id="wins">0</strong>
-          </div>
-          <div class="stat">
-            <small>Losses</small>
-            <strong id="losses">0</strong>
-          </div>
-          <div class="stat">
-            <small>Win rate</small>
-            <strong id="rate">—</strong>
-          </div>
-          <div class="stat">
-            <small>Streak</small>
-            <strong id="streak">0</strong>
-          </div>
-        </div>
-        <div style="margin-top: 16px; color: var(--muted); font-size: 0.88rem;" id="dailyStatus">Daily status: not played</div>
+        <h3 style="margin:0 0 8px 0">📊 Daily Stats</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div style="background:#f6fbff;padding:8px;border-radius:8px"><small style="color:var(--muted)">Wins</small><div id="wins">0</div></div><div style="background:#fff6f6;padding:8px;border-radius:8px"><small style="color:var(--muted)">Losses</small><div id="losses">0</div></div></div>
+        <div style="margin-top:8px;color:var(--muted)" id="dailyStatus">Daily status: not played</div>
       </section>
     </aside>
   </div>
 
   <script>
     const API = 'https://pokeapi.co/api/v2';
-    const $ = (id) => document.getElementById(id);
+    const $ = id => document.getElementById(id);
 
-    function safeParse(value, fallback) {
-      if (value === null || value === undefined || value === '') {
-        return fallback;
-      }
-      try {
-        return JSON.parse(value);
-      } catch (error) {
-        console.warn('Failed to parse saved data:', error);
-        return fallback;
-      }
-    }
+    function safeParse(v, f){ if (v==null||v==='') return f; try{return JSON.parse(v)}catch(e){return f} }
+    const today = ()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 
-    const today = () => {
-      const d = new Date();
-      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    };
-
-    const storageKeyTeam = 'gymTeam';
-    const storageKeyDaily = 'gymDaily';
-    const storageKeyStats = 'gymStats';
-
-    const defaultStats = { wins: 0, losses: 0, streak: 0, played: 0 };
-    const defaultDaily = {};
-
-    let dex = [];
-    let detailCache = {};
+    const storageKeyTeam='gymTeam', storageKeyDaily='gymDaily', storageKeyStats='gymStats';
+    const defaultStats={wins:0,losses:0,streak:0,played:0};
     let chosen = safeParse(localStorage.getItem(storageKeyTeam), []);
     let stats = safeParse(localStorage.getItem(storageKeyStats), defaultStats);
-    let daily = safeParse(localStorage.getItem(storageKeyDaily), defaultDaily);
-    let challenge = null;
-    let battle = null;
-    let gameStep = 'team';
+    let daily = safeParse(localStorage.getItem(storageKeyDaily), {});
+    let detailCache = {}, challenge=null, battle=null, moveLock=false;
 
-    function saveState() {
-      localStorage.setItem(storageKeyTeam, JSON.stringify(chosen));
-      localStorage.setItem(storageKeyStats, JSON.stringify(stats));
-      localStorage.setItem(storageKeyDaily, JSON.stringify(daily));
+    function saveState(){ localStorage.setItem(storageKeyTeam, JSON.stringify(chosen)); localStorage.setItem(storageKeyStats, JSON.stringify(stats)); localStorage.setItem(storageKeyDaily, JSON.stringify(daily)); }
+
+    function showStep(step){ ['teamBuilder','teamSummary','challengePanel','battlePanel','resultPanel'].forEach(id=>{const el=$(id); if(el) el.classList.toggle('step-hidden', !(step==='team' && id==='teamBuilder' || step==='challenge' && (id==='teamSummary'||id==='challengePanel') || step==='battle' && id==='battlePanel' || step==='result' && id==='resultPanel')) }) }
+
+    function updateStatsUI(){ $('wins').textContent = stats.wins||0; $('losses').textContent = stats.losses||0; $('dailyStatus').textContent = (daily[today()]?('Daily: '+daily[today()].result):'Daily status: not played'); }
+
+    function maxHP(p){ return Math.max(20, Math.floor((2*(p.stats?.hp||50)+31+63)*100/100)+100+10) }
+
+    async function getPokemon(idOrName){ if(detailCache[idOrName]) return detailCache[idOrName];
+      try{ const r=await fetch(API+'/pokemon/'+idOrName); if(!r.ok) throw 0; const p=await r.json(); const moves = p.moves.map(m=>m.move.name).slice(0,6); // we'll fetch move info lazily
+        const obj={id:p.id,name:p.name,sprite:p.sprites?.front_default||'',types:p.types.map(t=>t.type.name),stats:Object.fromEntries(p.stats.map(s=>[s.stat.name,s.base_stat])),moveNames:moves}; detailCache[p.id]=obj; detailCache[p.name]=obj; return obj }catch(e){throw e} }
+
+    async function moveInfo(name){ try{ const r=await fetch(API+'/move/'+name); if(!r.ok) throw 0; const m=await r.json(); return {name:m.name,power:m.power||40,type:m.type.name,accuracy:m.accuracy||100,damageClass:m.damage_class?.name||'physical'} }catch(e){ return {name, power:40, type:'normal', accuracy:100, damageClass:'physical'} } }
+
+    async function ensureMoves(p){ if(!p) return []; if(p.moves && p.moves.length) return p.moves; p.moves = [];
+      for(let i=0;i<Math.min(4,(p.moveNames||[]).length);i++){const name=p.moveNames[i]; const info = await moveInfo(name); p.moves.push(info)} if(p.moves.length===0) p.moves.push({name:'Struggle',power:50,type:'normal',accuracy:100,damageClass:'physical'}); return p.moves }
+
+    // Dex/search behavior: start empty and fetch on demand
+    async function searchPokemon(q){ if(!q) return; const term=q.trim().toLowerCase(); try{ $('dexGrid').innerHTML='<div style="grid-column:1/-1;padding:8px;color:var(--muted)">Searching…</div>'; const p = await getPokemon(term); renderSearchResults([p]); }catch(e){ $('dexGrid').innerHTML='<div style="grid-column:1/-1;padding:8px;color:var(--muted)">Not found</div>'; } }
+
+    function renderSearchResults(list){ $('dexGrid').innerHTML = list.map(p=>`<div class="dex-entry ${chosen.includes(p.id)?'selected':''}" data-id="${p.id}"><img src="${p.sprite||''}" alt="${p.name}" style="width:64px;height:64px"><div style="text-transform:capitalize">${p.name}</div><small>#${p.id}</small></div>`).join('') }
+
+    function renderSelected(){ const team = Array.from({length:6},(_,i)=>detailCache[chosen[i]]||null); $('teamCards').innerHTML = team.map(p=>p?`<div class="dex-entry selected" data-id="${p.id}"><img src="${p.sprite||''}" style="width:64px;height:64px"><div style="text-transform:capitalize">${p.name}</div><small>#${p.id}</small></div>`:'<div class="dex-entry" style="opacity:.6">Empty</div>').join(''); $('continueBtn').disabled = chosen.length!==6 }
+
+    document.addEventListener('click', async e=>{
+      const slot = e.target.closest('.dex-entry'); if(!slot) return; const id=slot.dataset.id; if(!id) return; // toggle selection
+      const parsed = Number(id)||id;
+      if(chosen.includes(Number(id))){ chosen = chosen.filter(x=>x!==Number(id)) } else if(chosen.length<6) { chosen.push(Number(id)) }
+      saveState(); renderSearchResults(Object.values(detailCache).filter((v,i,a)=>a.indexOf(v)===i)); renderSelected();
+    })
+
+    $('dexSearchBtn').addEventListener('click', ()=>searchPokemon($('dexSearch').value));
+    $('dexSearch').addEventListener('keydown', e=>{ if(e.key==='Enter') searchPokemon($('dexSearch').value) })
+    $('clearDexBtn').addEventListener('click', ()=>{ $('dexGrid').innerHTML='<div style="grid-column:1/-1;color:var(--muted);padding:12px">Search for a Pokémon by name or ID to add it to the picker. The list starts empty.</div>' })
+
+    // Challenge: pick daily challenge (deterministic) and ensure pokemon loaded
+    async function makeChallenge(){ const seed = Number(today().replace(/-/g,'')); const pool=[1,4,7,25,26,94,131,143,149,150,246,248,382,445,448,460]; const idx = Math.abs(Math.floor(seed*17+839))%pool.length; const trainer=['Blue','Red','Lance','Leaf','Giovanni','Steven'][Math.abs(Math.floor(seed/11))%6]; const ids = [pool[idx], pool[(idx+1)%pool.length], pool[(idx+2)%pool.length]]; challenge = {trainer, ids}; // ensure details
+      try{ const loaded = await Promise.all(ids.map(id=>getPokemon(id))); // store
+        $('challengeInfo').textContent = trainer + ' is challenging your Gym.'; renderChallengePreview(); }catch(e){ $('challengeInfo').textContent = 'Unable to load challenge data. Try reloading.'; }
     }
 
-    function showStep(step) {
-      gameStep = step;
-      const ids = {
-        team: ['teamBuilder'],
-        challenge: ['teamSummary', 'challengePanel'],
-        battle: ['battlePanel'],
-        result: ['resultPanel']
-      };
+    function renderChallengePreview(){ if(!challenge) return; $('previewEnemy').innerHTML = challenge.ids.map(id=>{ const p = detailCache[id]; if(!p) return '<div style="opacity:.6">Loading…</div>'; return `<div class="dex-entry"><img src="${p.sprite||''}" style="width:64px;height:64px"><div style="text-transform:capitalize">${p.name}</div><small>#${p.id}</small></div>` }).join('') }
 
-      const shown = new Set(ids[step] || []);
-      ['teamBuilder', 'teamSummary', 'challengePanel', 'battlePanel', 'resultPanel'].forEach((id) => {
-        const el = $(id);
-        if (el) el.classList.toggle('step-hidden', !shown.has(id));
-      });
-    }
+    // Battle helpers
+    function setHpFill(el, fraction){ el.style.width = Math.max(0, Math.min(100, Math.round(fraction*100))) + '%' }
 
-    function updateStats() {
-      $('wins').textContent = stats.wins || 0;
-      $('losses').textContent = stats.losses || 0;
-      $('rate').textContent = stats.played ? Math.round((stats.wins / stats.played) * 100) + '%' : '—';
-      $('streak').textContent = stats.streak || 0;
-      const done = daily[today()];
-      $('dailyStatus').textContent = done ? 'Daily status: ' + (done.result === 'win' ? 'won today' : 'played today') : 'Daily status: not played';
-    }
+    function damageCalc(att, def, mv){ const power = mv.power || 40; const atkStat = (att.stats && (mv.damageClass==='special'?att.stats['special-attack']:att.stats['attack']))||50; const defStat = (def.stats && (mv.damageClass==='special'?def.stats['special-defense']:def.stats['defense']))||50; const base = Math.max(1, Math.floor(power * (atkStat/defStat))); return base }
 
-    function makeChallenge() {
-      const seed = Number(today().replace(/-/g, ''));
-      const possibilities = [1, 4, 7, 25, 26, 94, 131, 143, 149, 150, 246, 248, 382, 445, 448, 460, 639, 724];
-      const index = Math.abs(Math.floor(seed * 17 + 839)) % possibilities.length;
-      const trainer = ['Blue', 'Red', 'Lance', 'Leaf', 'Giovanni', 'Steven'][Math.abs(Math.floor(seed / 11)) % 6];
-      challenge = {
-        trainer,
-        ids: possibilities.slice(index, index + 3).map((id) => Number(id))
-      };
-      $('challengeInfo').textContent = trainer + ' is challenging your Gym.';
-      renderChallengePreview();
-    }
+    function createDamageFx(text, x, y){ const el = document.createElement('div'); el.className='damage-fx'; el.textContent = text; document.body.appendChild(el); el.style.left = x+'px'; el.style.top = y+'px'; setTimeout(()=>el.remove(),900); }
 
-    function renderChallengePreview() {
-      if (!challenge) return;
-      const container = $('previewEnemy');
-      container.innerHTML = challenge.ids.map((id) => {
-        const p = detailCache[id];
-        if (!p) return '<div class="empty-slot">Loading…</div>';
-        return `
-          <div class="poke-card">
-            <img src="${p.sprite || ''}" alt="${p.name}">
-            <strong>${p.name}</strong>
-            <div class="type-row">${(p.types || []).map((type) => `<span class="type-badge" style="background:${typeToColor(type)}">${type}</span>`).join('')}</div>
-          </div>
-        `;
-      }).join('');
-    }
+    function animateMove(attEl, defEl){ return new Promise(res=>{ if(!attEl||!defEl){ setTimeout(res,300); return } attEl.classList.add('anim-forward'); setTimeout(()=>{ attEl.classList.remove('anim-forward'); defEl.classList.add('anim-shake'); setTimeout(()=>{ defEl.classList.remove('anim-shake'); res() },300) },320) }) }
 
-    function typeToColor(type) {
-      const map = {
-        normal: '#A8A77A', fire: '#EE8130', water: '#6390F0', electric: '#F7D02C', grass: '#7AC74C', ice: '#96D9D6',
-        fighting: '#C22E28', poison: '#A33EA1', ground: '#E2BF65', flying: '#A98FF3', psychic: '#F95587', bug: '#A6B91A',
-        rock: '#B6A136', ghost: '#735797', dragon: '#6F35FC', dark: '#705746', steel: '#B7B7CE', fairy: '#D685AD'
-      };
-      return map[type] || '#7990A9';
-    }
+    async function startBattle(){ if(chosen.length!==6) return alert('Pick 6 Pokémon first'); if(daily[today()]) return alert('You already played today'); // prepare teams
+      const myTeam = chosen.map(id=>detailCache[id]).map(p=>({p, currentHp: maxHP(p)})); const foeTeam = (challenge?challenge.ids.map(id=>detailCache[id]).filter(Boolean):[]).map(p=>({p, currentHp: maxHP(p)})); // ensure moves
+      for(const m of myTeam) await ensureMoves(m.p); for(const e of foeTeam) await ensureMoves(e.p);
+      battle = {player:myTeam, enemy:foeTeam, pi:0, ei:0, turn:1}; if(battle.enemy.length===0){ alert('Enemy team missing — cannot start'); return }
+      $('battleLog').textContent='The battle begins!'; updateBattleDisplay(); showStep('battle'); }
 
-    function cardHTML(p, small = false) {
-      if (!p) return '<div class="empty-slot">Empty slot</div>';
-      return `
-        <div class="${small ? 'mini-card' : 'poke-card'}">
-          <img src="${p.sprite || ''}" alt="${p.name}" loading="lazy">
-          <strong>${p.name}</strong>
-          <div class="type-row">${(p.types || []).map((type) => `<span class="type-badge" style="background:${typeToColor(type)}">${type}</span>`).join('')}</div>
-        </div>
-      `;
-    }
+    function updateBattleDisplay(){ if(!battle) return; const me = battle.player[battle.pi]; const foe = battle.enemy[battle.ei]; $('mySprite').src = me.p.sprite || ''; $('foeSprite').src = foe.p.sprite || ''; $('myName').textContent = me.p.name || ''; $('foeName').textContent = foe.p.name || ''; setHpFill($('myHpFill'), me.currentHp / maxHP(me.p)); setHpFill($('foeHpFill'), foe.currentHp / maxHP(foe.p)); // moves
+      const moves = (me.p.moves||[]).slice(0,4); $('moveButtons').innerHTML = moves.map((mv,i)=>`<button class="move-btn" data-move="${i}">${mv.name.replace('-',' ')}</button>`).join(''); }
 
-    function renderTeamCards() {
-      const team = chosen.map((id) => detailCache[id]).filter(Boolean);
-      const slots = Array.from({ length: 6 }, (_, i) => team[i] || null);
-      $('teamCards').innerHTML = slots.map((p) => cardHTML(p)).join('');
-      $('teamNote').textContent = chosen.length === 6 ? 'Your Gym team is ready.' : 'Pick 6 Pokémon for your Gym.';
-      $('continueBtn').disabled = chosen.length !== 6;
-    }
-
-    async function loadDex() {
-      try {
-        const response = await fetch(API + '/pokemon?limit=386');
-        if (!response.ok) throw new Error('API unavailable');
-        const data = await response.json();
-        dex = data.results.map((entry, index) => ({
-          id: index + 1,
-          name: entry.name,
-          url: entry.url,
-          sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${index + 1}.png`
-        }));
-
-        for (const item of dex) {
-          const details = await getPokemon(item.id);
-          detailCache[item.id] = details;
-        }
-
-        renderDex();
-        renderTeamCards();
-      } catch (error) {
-        console.error(error);
-        $('dexGrid').innerHTML = '<div class="panel" style="width:100%">Unable to load Pokémon data. Check your internet connection and reload the page.</div>';
+    // handle player move clicks
+    document.addEventListener('click', async e=>{ const mvBtn = e.target.closest('[data-move]'); if(!mvBtn||!battle||moveLock) return; moveLock=true; const idx=Number(mvBtn.dataset.move); const me = battle.player[battle.pi]; const foe = battle.enemy[battle.ei]; const mv = (me.p.moves||[])[idx] || {name:'Tackle',power:40,damageClass:'physical'}; // animate
+      await animateMove($( 'mySprite'), $('foeSprite'));
+      const dmg = damageCalc(me.p, foe.p, mv); foe.currentHp = Math.max(0, foe.currentHp - dmg); // show damage
+      const rect = $('foeSprite').getBoundingClientRect(); createDamageFx('-'+dmg, rect.left+rect.width/2, rect.top+20);
+      setHpFill($('foeHpFill'), foe.currentHp / maxHP(foe.p)); $('battleLog').textContent = `${me.p.name} used ${mv.name}! It dealt ${dmg} damage.`;
+      await new Promise(r=>setTimeout(r,450));
+      if(foe.currentHp<=0){ // faint
+        $('battleLog').textContent += `\n${foe.p.name} fainted!`;
+        $('foeSprite').classList.add('faint'); await new Promise(r=>setTimeout(r,650)); battle.ei++;
+        if(battle.ei >= battle.enemy.length){ finishBattle(true); moveLock=false; return } else { $('foeSprite').classList.remove('faint'); updateBattleDisplay(); }
       }
-    }
+      // enemy turn
+      await new Promise(r=>setTimeout(r,250)); const foeMove = (foe.p.moves && foe.p.moves[Math.floor(Math.random()*(foe.p.moves.length||1))])||{name:'Tackle',power:40,damageClass:'physical'};
+      await animateMove($('foeSprite'), $('mySprite'));
+      const dmg2 = damageCalc(foe.p, me.p, foeMove); me.currentHp = Math.max(0, me.currentHp - dmg2); const rect2 = $('mySprite').getBoundingClientRect(); createDamageFx('-'+dmg2, rect2.left+rect2.width/2, rect2.top+20);
+      setHpFill($('myHpFill'), me.currentHp / maxHP(me.p)); $('battleLog').textContent += `\n${foe.p.name} used ${foeMove.name}! It dealt ${dmg2} damage.`;
+      await new Promise(r=>setTimeout(r,450)); if(me.currentHp<=0){ $('battleLog').textContent += `\n${me.p.name} fainted!`; $('mySprite').classList.add('faint'); await new Promise(r=>setTimeout(r,650)); battle.pi++; if(battle.pi >= battle.player.length){ finishBattle(false); moveLock=false; return } else { $('mySprite').classList.remove('faint'); updateBattleDisplay(); } }
+      moveLock=false;
+    })
 
-    async function getPokemon(id) {
-      if (detailCache[id]) return detailCache[id];
-      const response = await fetch(API + '/pokemon/' + id);
-      if (!response.ok) throw new Error('Pokemon load failed');
-      const p = await response.json();
-      const result = {
-        id: p.id,
-        name: p.name,
-        sprite: p.sprites?.other?.dream_world?.front_default || p.sprites?.front_default || '',
-        types: p.types.map((x) => x.type.name),
-        stats: Object.fromEntries(p.stats.map((s) => [s.stat.name, s.base_stat]))
-      };
-      detailCache[id] = result;
-      return result;
-    }
+    function finishBattle(win){ daily[today()]={result:win?'win':'loss'}; stats.played=(stats.played||0)+1; if(win){ stats.wins=(stats.wins||0)+1; stats.streak=(stats.streak||0)+1 } else { stats.losses=(stats.losses||0)+1; stats.streak=0 } saveState(); updateStatsUI(); $('resultSummary').textContent = win? 'You defended your gym!':'You lost. Try again tomorrow.'; showStep('result'); }
 
-    function renderDex() {
-      const q = $('dexSearch').value.toLowerCase().trim();
-      const genFilter = $('genFilter').value;
-      const items = dex.filter((p) => {
-        const matchesQuery = !q || p.name.includes(q) || String(p.id).includes(q);
-        const matchesGen = genFilter === 'all' || (genFilter === '1' && p.id <= 151) || (genFilter === '2' && p.id >= 152 && p.id <= 251) || (genFilter === '3' && p.id >= 252 && p.id <= 386);
-        return matchesQuery && matchesGen;
-      });
+    // buttons
+    $('continueBtn').addEventListener('click', ()=>{ if(chosen.length!==6) return alert('Choose 6!'); makeChallenge().then(()=>showStep('challenge')); })
+    $('startBtn').addEventListener('click', ()=>startBattle())
+    $('backToTeamBtn').addEventListener('click', ()=>showStep('team'))
+    $('newChallengeBtn').addEventListener('click', ()=>{ makeChallenge(); showStep('challenge'); })
 
-      $('dexGrid').innerHTML = items.map((p) => {
-        const selected = chosen.includes(p.id);
-        return `
-          <div class="dex-entry ${selected ? 'selected' : ''}" data-id="${p.id}" tabindex="0">
-            <img src="${p.sprite || ''}" alt="${p.name}">
-            <strong>${p.name}</strong>
-            <small>#${p.id}</small>
-          </div>
-        `;
-      }).join('');
-    }
+    // time
+    function tick(){ const n=new Date(), end=new Date(n); end.setHours(24,0,0,0); const s=Math.max(0,Math.floor((end-n)/1000)); $('countdown').textContent = [Math.floor(s/3600),Math.floor(s%3600/60),s%60].map(v=>String(v).padStart(2,'0')).join(':') }
 
-    document.addEventListener('click', async (event) => {
-      const entry = event.target.closest('[data-id]');
-      if (!entry) return;
-      const id = Number(entry.dataset.id);
-
-      if (chosen.includes(id)) {
-        chosen = chosen.filter((x) => x !== id);
-      } else if (chosen.length < 6) {
-        chosen.push(id);
-      }
-
-      saveState();
-      renderDex();
-      renderTeamCards();
-    });
-
-    $('dexSearch').addEventListener('input', renderDex);
-    $('genFilter').addEventListener('change', renderDex);
-    $('continueBtn').addEventListener('click', () => {
-      if (chosen.length !== 6) return;
-      saveState();
-      makeChallenge();
-      showStep('challenge');
-    });
-
-    $('editTeamBtn').addEventListener('click', () => {
-      showStep('team');
-    });
-
-    $('backToTeamBtn').addEventListener('click', () => {
-      showStep('team');
-    });
-
-    $('startBtn').addEventListener('click', () => {
-      if (chosen.length !== 6) return;
-      const myTeam = chosen.map((id) => detailCache[id]).filter(Boolean);
-      const foeTeam = challenge ? challenge.ids.map((id) => detailCache[id]).filter(Boolean) : [];
-      const player = myTeam.slice(0, 6);
-      const enemy = foeTeam.slice(0, 3);
-
-      battle = {
-        player,
-        enemy,
-        turn: 0,
-        playerIndex: 0,
-        enemyIndex: 0
-      };
-      $('battleStatus').textContent = 'Battle in progress';
-      updateBattleDisplay();
-      showStep('battle');
-    });
-
-    function updateBattleDisplay() {
-      if (!battle) return;
-      const me = battle.player[battle.playerIndex];
-      const foe = battle.enemy[battle.enemyIndex];
-      $('mySprite').src = me?.sprite || '';
-      $('foeSprite').src = foe?.sprite || '';
-      $('myName').textContent = me?.name || '—';
-      $('foeName').textContent = foe?.name || '—';
-
-      $('moveButtons').innerHTML = (me?.types || []).length ? ['Attack', 'Guard', 'Burst'].map((label, idx) => `<button class="move-btn" type="button" data-move="${idx}">${label}</button>`).join('') : '';
-    }
-
-    document.addEventListener('click', (event) => {
-      const moveBtn = event.target.closest('[data-move]');
-      if (!moveBtn || !battle) return;
-      const move = Number(moveBtn.dataset.move);
-      const me = battle.player[battle.playerIndex];
-      const foe = battle.enemy[battle.enemyIndex];
-      if (!me || !foe) return;
-
-      const log = [`${me.name} uses ${['Attack', 'Guard', 'Burst'][move]}.`];
-      let damage = 0;
-      if (move === 0) damage = 18 + (me.stats?.attack || 10);
-      if (move === 1) damage = 0;
-      if (move === 2) damage = 30 + (me.stats?.special_attack || 10);
-
-      const foeHP = Math.max(0, (foe.stats?.hp || 60) - damage);
-      log.push(`${foe.name} takes ${damage} damage.`);
-      foe.stats.hp = foeHP;
-      $('battleLog').textContent = log.join('\n');
-
-      if (foeHP <= 0) {
-        battle.enemyIndex += 1;
-        const nextFoe = battle.enemy[battle.enemyIndex];
-        if (nextFoe) {
-          $('battleLog').textContent = `${foe.name} faints. ${nextFoe.name} enters!\n` + $('battleLog').textContent;
-          battle.enemyIndex = battle.enemyIndex;
-          updateBattleDisplay();
-        } else {
-          const result = { result: 'win', trainer: challenge?.trainer || 'Challenge' };
-          daily[today()] = result;
-          stats.played = (stats.played || 0) + 1;
-          stats.wins = (stats.wins || 0) + 1;
-          stats.streak = (stats.streak || 0) + 1;
-          saveState();
-          updateStats();
-          $('resultTitle').textContent = 'Victory!';
-          $('resultSummary').textContent = `You defeated ${challenge?.trainer || 'the challenger'} and defended your Gym.`;
-          showStep('result');
-        }
-      }
-    });
-
-    $('newChallengeBtn').addEventListener('click', () => {
-      makeChallenge();
-      showStep('challenge');
-    });
-
-    function tick() {
-      const now = new Date();
-      const end = new Date(now);
-      end.setHours(24, 0, 0, 0);
-      const seconds = Math.max(0, Math.floor((end - now) / 1000));
-      const hh = String(Math.floor(seconds / 3600)).padStart(2, '0');
-      const mm = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-      const ss = String(seconds % 60).padStart(2, '0');
-      $('countdown').textContent = `${hh}:${mm}:${ss}`;
-    }
-
-    function init() {
-      chosen = Array.isArray(chosen) ? chosen.slice(0, 6) : [];
-      stats = { ...defaultStats, ...stats };
-      daily = daily && typeof daily === 'object' ? daily : defaultDaily;
-      updateStats();
-      renderTeamCards();
-      makeChallenge();
-      showStep('team');
-      loadDex();
-      tick();
-      setInterval(tick, 1000);
-    }
-
-    init();
+    // init
+    (function init(){ chosen = Array.isArray(chosen)?chosen.slice(0,6):[]; stats = {...defaultStats,...stats}; daily = daily && typeof daily==='object'?daily:{}; updateStatsUI(); renderSelected(); makeChallenge(); tick(); setInterval(tick,1000); })();
   </script>
 </body>
 </html>
