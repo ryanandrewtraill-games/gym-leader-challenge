@@ -72,11 +72,12 @@
 
         <div style="margin-top:12px">
           <h3 style="margin:6px 0">Selected team (click to remove)</h3>
+          <div style="margin:6px 0;color:var(--muted);font-weight:700" id="teamCount">0/6 selected</div>
           <div id="teamCards" class="dex-grid" style="grid-template-columns:repeat(3,1fr)"></div>
         </div>
 
         <div style="margin-top:12px" class="controls">
-          <button id="continueBtn" style="background:var(--blue);color:#fff;padding:8px;border-radius:8px">Continue</button>
+          <button id="continueBtn" style="background:var(--blue);color:#fff;padding:8px;border-radius:8px;opacity:0.5;cursor:not-allowed" disabled>Continue</button>
         </div>
       </section>
 
@@ -111,9 +112,7 @@
       </section>
 
       <section class="panel step-hidden" id="resultPanel">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <h2 style="margin:0">🏆 Results</h2>
-        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">🏆 Results</h2></div>
         <div id="resultSummary" class="battle-log"></div>
         <div style="margin-top:8px" class="controls">
           <button id="newChallengeBtn" class="primary" style="background:var(--blue);color:#fff;padding:8px;border-radius:8px">Play again</button>
@@ -143,32 +142,6 @@
   <script>
     const API = 'https://pokeapi.co/api/v2';
     const $ = (id) => document.getElementById(id);
-    const typeColors = {
-      normal:'#A8A77A', fire:'#EE8130', water:'#6390F0', electric:'#F7D02C', grass:'#7AC74C', ice:'#96D9D6',
-      fighting:'#C22E28', poison:'#A33EA1', ground:'#E2BF65', flying:'#A98FF3', psychic:'#F95587', bug:'#A6B91A',
-      rock:'#B6A136', ghost:'#735797', dragon:'#6F35FC', dark:'#705746', steel:'#B7B7CE', fairy:'#D685AD'
-    };
-
-    const typeChart = {
-      normal:{rock:0.5, ghost:0, steel:0.5},
-      fire:{fire:0.5, water:0.5, grass:2, ice:2, bug:2, rock:0.5, dragon:0.5, steel:2},
-      water:{fire:2, water:0.5, grass:0.5, ground:2, rock:2, dragon:0.5},
-      electric:{water:2, electric:0.5, grass:0.5, ground:0, flying:2, dragon:0.5},
-      grass:{fire:0.5, water:2, grass:0.5, poison:0.5, ground:2, flying:0.5, bug:0.5, rock:2, dragon:0.5, steel:0.5},
-      ice:{fire:0.5, water:0.5, grass:2, ice:0.5, ground:2, flying:2, dragon:2, steel:0.5},
-      fighting:{normal:2, ice:2, poison:0.5, flying:0.5, psychic:0.5, bug:0.5, rock:2, ghost:0, dark:2, steel:2},
-      poison:{grass:2, poison:0.5, ground:0.5, rock:0.5, ghost:0.5, steel:0},
-      ground:{fire:2, electric:2, grass:0.5, poison:2, flying:0, bug:0.5, rock:2, steel:2},
-      flying:{electric:0.5, grass:2, fighting:2, bug:2, rock:0.5, steel:0.5},
-      psychic:{fighting:2, poison:2, psychic:0.5, dark:0, steel:0.5},
-      bug:{fire:0.5, grass:2, fighting:0.5, poison:0.5, flying:0.5, psychic:2, ghost:0.5, dark:2, steel:0.5},
-      rock:{fire:2, ice:2, fighting:0.5, ground:0.5, flying:2, bug:2, steel:0.5},
-      ghost:{normal:0, ghost:2, psychic:0.5, dark:0.5},
-      dragon:{dragon:2, steel:0.5},
-      dark:{fighting:0.5, psychic:2, ghost:2},
-      steel:{fire:0.5, water:0.5, electric:0.5, ice:2, rock:2, steel:0.5, fairy:2},
-      fairy:{fire:0.5, fighting:2, poison:0.5, dragon:2, dark:2, steel:0.5}
-    };
 
     function safeParse(v, fallback) {
       if (v === null || v === '') return fallback;
@@ -176,19 +149,13 @@
     }
 
     const storageKeyTeam = 'gymTeam';
-    const storageKeyStats = 'gymStats';
-    const defaultStats = { wins: 0, losses: 0, streak: 0, played: 0 };
-
     let chosen = safeParse(localStorage.getItem(storageKeyTeam), []);
-    let stats = safeParse(localStorage.getItem(storageKeyStats), defaultStats);
     let detailCache = {};
     let challenge = null;
     let battle = null;
-    let moveLock = false;
 
-    function saveState() {
+    function saveTeam() {
       localStorage.setItem(storageKeyTeam, JSON.stringify(chosen));
-      localStorage.setItem(storageKeyStats, JSON.stringify(stats));
     }
 
     function normalizeChoiceList(list) {
@@ -210,12 +177,6 @@
       });
     }
 
-    function updateStatsUI() {
-      $('wins').textContent = stats.wins || 0;
-      $('losses').textContent = stats.losses || 0;
-      $('dailyStatus').textContent = 'Testing mode: daily lock off';
-    }
-
     function buildDexRange(gen) {
       if (gen === '1') return Array.from({ length: 151 }, (_, i) => i + 1);
       if (gen === '2') return Array.from({ length: 100 }, (_, i) => i + 152);
@@ -223,10 +184,19 @@
       return Array.from({ length: 386 }, (_, i) => i + 1);
     }
 
+    function updateTeamCount() {
+      const count = chosen.length;
+      $('teamCount').textContent = `${count}/6 selected`;
+      const btn = $('continueBtn');
+      const isReady = count === 6;
+      btn.disabled = !isReady;
+      btn.style.opacity = isReady ? '1' : '0.5';
+      btn.style.cursor = isReady ? 'pointer' : 'not-allowed';
+    }
+
     async function getPokemon(idOrName) {
       const key = String(idOrName).toLowerCase();
       if (detailCache[key]) return detailCache[key];
-
       const lookup = Number(idOrName) || idOrName;
       try {
         const res = await fetch(`${API}/pokemon/${lookup}`);
@@ -250,12 +220,13 @@
 
     function renderDexGrid(list) {
       const items = list || [];
-      $('dexGrid').innerHTML = items.map((id) => {
+      const grid = $('dexGrid');
+      grid.innerHTML = items.map((id) => {
         const p = detailCache[String(id)] || null;
         const selected = chosen.includes(Number(id));
         const sprite = p?.sprite || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
         return `
-          <div class="dex-entry ${selected ? 'selected' : ''}" data-id="${id}" style="padding:8px;text-align:center;cursor:pointer">
+          <div class="dex-entry ${selected ? 'selected' : ''}" data-id="${id}">
             <img class="mini" src="${sprite}" alt="${p?.name || 'Pokémon'}">
             <div style="font-weight:700">#${id}</div>
             <small style="color:var(--muted)">${p ? p.name : 'Loading...'}</small>
@@ -266,17 +237,19 @@
 
     function renderSelected() {
       const team = Array.from({ length: 6 }, (_, i) => chosen[i] || null);
-      $('teamCards').innerHTML = team.map((id) => {
+      const cards = $('teamCards');
+      cards.innerHTML = team.map((id) => {
         if (!id) return '<div class="dex-entry" style="opacity:0.6">Empty</div>';
         const p = detailCache[String(id)] || null;
         const sprite = p?.sprite || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
         return `
-          <div class="dex-entry selected" data-id="${id}" style="padding:8px;text-align:center">
+          <div class="dex-entry selected" data-id="${id}">
             <img class="mini" src="${sprite}" alt="${p?.name || 'Pokémon'}">
             <div style="font-weight:700">${p ? p.name : `#${id}`}</div>
           </div>
         `;
       }).join('');
+      updateTeamCount();
     }
 
     async function refreshDexDisplay() {
@@ -289,8 +262,8 @@
         for (const id of list) {
           const p = await getPokemon(id);
           if (!p) continue;
-          const haystack = `${p.name} ${id}`.toLowerCase();
-          if (haystack.includes(q)) matches.push(id);
+          const text = `${p.name} ${id}`.toLowerCase();
+          if (text.includes(q)) matches.push(id);
         }
         list = matches;
       }
@@ -310,9 +283,67 @@
         }
         chosen.push(num);
       }
-      saveState();
+      saveTeam();
       renderSelected();
       renderDexGrid(buildDexRange($('genFilter').value || 'all'));
+    }
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    async function makeChallenge() {
+      const pool = buildDexRange('all');
+      const ids = shuffle(pool).slice(0, 6);
+      challenge = {
+        trainer: ['Blue', 'Red', 'Lance', 'Leaf', 'Giovanni', 'Steven'][Math.floor(Math.random() * 6)],
+        ids
+      };
+      await Promise.all(challenge.ids.map(id => getPokemon(id)));
+      $('previewEnemy').innerHTML = challenge.ids.map((id) => {
+        const p = detailCache[String(id)];
+        const sprite = p?.sprite || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+        return `
+          <div class="dex-entry" style="text-align:center">
+            <img class="mini" src="${sprite}" alt="${p?.name || '#'+id}">
+            <div style="font-weight:700">${p?.name || '#'+id}</div>
+          </div>
+        `;
+      }).join('');
+      $('challengeInfo').textContent = `Facing: ${challenge.trainer}`;
+    }
+
+    async function startBattle() {
+      if (chosen.length !== 6) {
+        alert('Choose 6 Pokémon first');
+        return;
+      }
+      if (!challenge) await makeChallenge();
+      const player = [];
+      for (const id of chosen) {
+        const p = await getPokemon(id);
+        player.push({ p, currentHp: 100, maxHp: 100 });
+      }
+      const enemy = [];
+      for (const id of challenge.ids) {
+        const p = await getPokemon(id);
+        enemy.push({ p, currentHp: 100, maxHp: 100 });
+      }
+      battle = { player, enemy, pi: 0, ei: 0 };
+      const me = battle.player[battle.pi];
+      const foe = battle.enemy[battle.ei];
+      $('mySprite').src = me.p.sprite || '';
+      $('foeSprite').src = foe.p.sprite || '';
+      $('myName').textContent = me.p.name;
+      $('foeName').textContent = foe.p.name;
+      $('myHpFill').style.width = '100%';
+      $('foeHpFill').style.width = '100%';
+      $('battleLog').textContent = `Battle start! ${challenge.trainer} is ready.`;
+      showStep('battle');
     }
 
     document.addEventListener('click', async (event) => {
@@ -349,89 +380,45 @@
       refreshDexDisplay();
     });
 
-    function shuffle(array){ for(let i=array.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [array[i],array[j]]=[array[j],array[i]; } return array; }
-
-    async function makeChallenge(){
-      const pool = buildDexRange('all');
-      const ids = shuffle(pool).slice(0,6);
-      challenge = { trainer: ['Blue','Red','Lance','Leaf','Giovanni','Steven'][Math.floor(Math.random()*6)], ids };
-      await Promise.all(challenge.ids.map(id => getPokemon(id)));
-      $('previewEnemy').innerHTML = challenge.ids.map(id => {
-        const p = detailCache[String(id)];
-        const sprite = p?.sprite || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
-        return `
-          <div class="dex-entry" style="text-align:center">
-            <img class="mini" src="${sprite}" alt="${p?.name || '#'+id}">
-            <div style="font-weight:700">${p?.name || '#'+id}</div>
-          </div>
-        `;
-      }).join('');
-      $('challengeInfo').textContent = `Facing: ${challenge.trainer}`;
-    }
-
-    function setHpFill(el, fraction){ el.style.width = Math.max(0, Math.min(100, Math.round(fraction*100))) + '%'; }
-
-    async function startBattle(){
-      if (chosen.length !== 6) return alert('Pick 6 Pokémon first');
-      if (!challenge) await makeChallenge();
-
-      const player = [];
-      for (const id of chosen.slice(0,6)){
-        const p = await getPokemon(id);
-        player.push({ p, currentHp: 100, maxHp: 100 });
+    $('continueBtn').addEventListener('click', async () => {
+      if (chosen.length !== 6) {
+        alert('Choose 6 Pokémon first');
+        return;
       }
-      const enemy = [];
-      for (const id of challenge.ids.slice(0,6)){
-        const p = await getPokemon(id);
-        enemy.push({ p, currentHp: 100, maxHp: 100 });
-      }
-      battle = { player, enemy, pi: 0, ei: 0 };
-      updateBattleDisplay();
-      showStep('battle');
-      $('battleLog').textContent = `Battle start! ${challenge.trainer} vs your team.`;
-    }
-
-    function updateBattleDisplay(){
-      if (!battle) return;
-      const me = battle.player[battle.pi];
-      const foe = battle.enemy[battle.ei];
-      if (!me || !foe) return;
-      $('mySprite').src = me.p.sprite || '';
-      $('foeSprite').src = foe.p.sprite || '';
-      $('myName').textContent = me.p.name;
-      $('foeName').textContent = foe.p.name;
-      setHpFill($('myHpFill'), me.currentHp / me.maxHp);
-      setHpFill($('foeHpFill'), foe.currentHp / foe.maxHp);
-    }
-
-    $('continueBtn')?.addEventListener('click', async ()=>{
-      if (chosen.length !== 6) return alert('Choose 6 Pokémon first');
       await makeChallenge();
       showStep('challenge');
     });
 
-    $('startBtn')?.addEventListener('click', async ()=>{
+    $('startBtn').addEventListener('click', async () => {
       await startBattle();
     });
 
-    $('backToTeamBtn')?.addEventListener('click', ()=> showStep('team'));
-    $('newChallengeBtn')?.addEventListener('click', async ()=>{ await makeChallenge(); showStep('challenge'); });
+    $('backToTeamBtn').addEventListener('click', () => {
+      showStep('team');
+    });
+
+    $('newChallengeBtn').addEventListener('click', async () => {
+      await makeChallenge();
+      showStep('challenge');
+    });
 
     function tick() {
       const now = new Date();
-      const end = new Date(now); end.setHours(24,0,0,0);
-      const diff = Math.max(0, Math.floor((end-now)/1000));
-      const h = Math.floor(diff/3600); const m = Math.floor((diff%3600)/60); const s = diff%60;
-      $('countdown').textContent = [h,m,s].map(v=>String(v).padStart(2,'0')).join(':');
+      const end = new Date(now);
+      end.setHours(24, 0, 0, 0);
+      const diff = Math.max(0, Math.floor((end - now) / 1000));
+      const h = Math.floor(diff / 3600);
+      const m = Math.floor((diff % 3600) / 60);
+      const s = diff % 60;
+      $('countdown').textContent = [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
     }
 
     (async function init() {
       chosen = normalizeChoiceList(chosen);
-      stats = { ...defaultStats, ...stats };
-      updateStatsUI();
       renderSelected();
       await refreshDexDisplay();
-      tick(); setInterval(tick, 1000);
+      tick();
+      setInterval(tick, 1000);
       showStep('team');
     })();
   </script>
