@@ -55,7 +55,7 @@
           <button id="clearDexBtn">Clear</button>
         </div>
         <div id="dexGrid" class="dex-grid"><div style="grid-column:1/-1;color:var(--muted);padding:12px">Search for a Pokémon by name or ID to add it to the picker. The list starts empty.</div></div>
-        <div style="margin-top:12px"><h3 style="margin:6px 0">Selected team</h3><div id="teamCards" class="dex-grid" style="grid-template-columns:repeat(3,1fr)"></div></div>
+        <div style="margin-top:12px"><h3 style="margin:6px 0">Selected team (click to remove)</h3><div id="teamCards" class="dex-grid" style="grid-template-columns:repeat(3,1fr)"></div></div>
       </section>
 
       <section class="panel step-hidden" id="challengePanel">
@@ -171,30 +171,53 @@
       $('teamNote').textContent = chosen.length===6 ? 'Your team is ready.' : 'Pick 6 Pokémon for your Gym.';
     }
 
+    // click handling: clicking a search result adds immediately; clicking a selected team slot removes it
     document.addEventListener('click', async e=>{
-      const slot = e.target.closest('.dex-entry');
-      if(!slot) return;
-      const id=Number(slot.dataset.id);
-      if(!id) return;
-      if(chosen.includes(id)) chosen = chosen.filter(x=>x!==id); else if(chosen.length<6) chosen.push(id);
-      saveState();
-      renderSelected();
-      if($('dexGrid').innerHTML.includes('Searching') || $('dexGrid').innerHTML.includes('Not found') || $('dexGrid').innerHTML.includes('Pick 6 Pokémon')){ /* keep results stable for a moment */ }
-      if(detailCache[id]) renderSearchResults(Object.values(detailCache).filter(Boolean));
+      const searchSlot = e.target.closest('#dexGrid .dex-entry');
+      if(searchSlot){
+        const id = Number(searchSlot.dataset.id);
+        if(!id) return;
+        if(!chosen.includes(id)){
+          if(chosen.length >= 6){ alert('Team is full — remove a Pokémon from Selected team if you want to change it'); return; }
+          chosen.push(id);
+          saveState();
+          renderSelected();
+          renderSearchResults(Object.values(detailCache).filter(v=>v && v.id));
+        }
+        return;
+      }
+      const teamSlot = e.target.closest('#teamCards .dex-entry');
+      if(teamSlot){
+        const id = Number(teamSlot.dataset.id);
+        if(!id) return;
+        chosen = chosen.filter(x=>x!==id);
+        saveState();
+        renderSelected();
+        renderSearchResults(Object.values(detailCache).filter(v=>v && v.id));
+        return;
+      }
     });
 
     $('dexSearchBtn').addEventListener('click', ()=>searchPokemon($('dexSearch').value));
     $('dexSearch').addEventListener('keydown', e=>{ if(e.key==='Enter') searchPokemon($('dexSearch').value) })
     $('clearDexBtn').addEventListener('click', ()=>{ $('dexGrid').innerHTML='<div style="grid-column:1/-1;color:var(--muted);padding:12px">Search for a Pokémon by name or ID to add it to the picker. The list starts empty.</div>'; });
 
+    // pick 6 random Pokémon from gen 1-3 for the rival
+    function shuffle(array){ for(let i=array.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [array[i],array[j]]=[array[j],array[i]] } return array }
+
     async function makeChallenge(){
-      const seed = Number(today().replace(/-/g,''));
-      const pool=[1,4,7,25,26,94,131,143,149,150,246,248,382,445,448,460];
-      const idx = Math.abs(Math.floor(seed*17+839))%pool.length;
-      const trainer=['Blue','Red','Lance','Leaf','Giovanni','Steven'][Math.abs(Math.floor(seed/11))%6];
-      challenge = {trainer, ids:[pool[idx], pool[(idx+1)%pool.length], pool[(idx+2)%pool.length]]};
-      $('challengeInfo').textContent = trainer + ' is challenging your Gym.';
-      renderChallengePreview();
+      // full gen1-3 pool (1..386)
+      const pool = Array.from({length:386},(_,i)=>i+1);
+      shuffle(pool);
+      const ids = pool.slice(0,6);
+      const trainer = ['Blue','Red','Lance','Leaf','Giovanni','Steven'][Math.floor(Math.random()*6)];
+      challenge = {trainer, ids};
+      // ensure details
+      try{
+        await Promise.all(ids.map(id=>getPokemon(id).catch(()=>null)));
+        $('challengeInfo').textContent = trainer + ' is challenging your Gym.';
+        renderChallengePreview();
+      }catch(e){ $('challengeInfo').textContent = 'Unable to load challenge data. Try reloading.'; }
     }
 
     function renderChallengePreview(){
