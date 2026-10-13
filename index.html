@@ -34,7 +34,7 @@
     .disabled{opacity:.5;pointer-events:none}
 
     /* switch panel */
-    .switch-panel{position:absolute;left:50%;top:60%;transform:translate(-50%,0);background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;z-index:50;box-shadow:0 6px 18px rgba(0,0,0,0.15)}
+    .switch-panel{position:absolute;left:50%;top:60%;transform:translate(-50%,0);background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;z-index:50;box-shadow:0 6px 18px rgba([..])}
     .switch-grid{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
     .switch-slot{width:90px;text-align:center;border:1px solid var(--line);padding:6px;border-radius:8px;cursor:pointer;background:#fff}
     .switch-slot.disabled{opacity:.5;pointer-events:none}
@@ -158,6 +158,26 @@
     const API = 'https://pokeapi.co/api/v2';
     const $ = (id) => document.getElementById(id);
 
+    const TYPE_CHART = {
+      normal:   { rock: 0.5, ghost: 0, steel: 0.5 },
+      fire:     { fire: 0.5, water: 0.5, grass: 2, ice: 2, bug: 2, rock: 0.5, dragon: 0.5, steel: 2 },
+      water:    { fire: 2, water: 0.5, grass: 0.5, ground: 2, rock: 2, dragon: 0.5 },
+      electric: { water: 2, electric: 0.5, grass: 0.5, ground: 0, flying: 2, dragon: 0.5 },
+      grass:    { fire: 0.5, water: 2, grass: 0.5, poison: 0.5, ground: 2, flying: 0.5, bug: 0.5, rock: 2, dragon: 0.5, steel: 0.5 },
+      ice:      { fire: 0.5, water: 0.5, grass: 2, ice: 0.5, ground: 2, flying: 2, dragon: 2, steel: 0.5 },
+      fighting: { normal: 2, ice: 2, rock: 2, dark: 2, steel: 2, psychic: 0.5, flying: 0.5, poison: 0.5, bug: 0.5, ghost: 0 },
+      poison:   { grass: 2, poison: 0.5, ground: 0.5, rock: 0.5, ghost: 0.5, steel: 0 },
+      ground:   { fire: 2, electric: 2, grass: 0.5, poison: 2, flying: 0, bug: 0.5, rock: 2, steel: 2 },
+      flying:   { electric: 0.5, grass: 2, fighting: 2, bug: 2, rock: 0.5, steel: 0.5 },
+      psychic:  { fighting: 2, poison: 2, psychic: 0.5, steel: 0.5, dark: 0 },
+      bug:      { fire: 0.5, grass: 2, fighting: 0.5, poison: 0.5, flying: 0.5, psychic: 2, ghost: 0.5, dark: 2, steel: 0.5 },
+      rock:     { fire: 2, ice: 2, fighting: 0.5, ground: 0.5, flying: 2, bug: 2, steel: 0.5 },
+      ghost:    { normal: 0, psychic: 0.5, ghost: 2, dark: 0.5 },
+      dragon:   { dragon: 2, steel: 0.5 },
+      dark:     { fighting: 0.5, psychic: 2, ghost: 2, dark: 0.5 },
+      steel:    { fire: 0.5, water: 0.5, electric: 0.5, ice: 2, rock: 2, steel: 0.5 }
+    };
+
     function safeParse(v, fallback) {
       if (v === null || v === '') return fallback;
       try { return JSON.parse(v); } catch (e) { return fallback; }
@@ -248,14 +268,13 @@
     async function ensureMoves(p) {
       if (!p) return [];
       if (p._moves && p._moves.length) return p._moves;
-      const names = (p.moveNames || []).slice(0, 8); // try first 8 to choose from
+      const names = (p.moveNames || []).slice(0, 8);
       const moves = [];
       for (const n of names) {
         const mv = await fetchMove(n);
         moves.push(mv);
         if (moves.length >= 4) break;
       }
-      // if still less than 4, add simple defaults
       while (moves.length < 4) moves.push({ name: 'tackle', power: 40, type: 'normal', accuracy: 100, damageClass: 'physical' });
       p._moves = moves;
       return moves;
@@ -412,7 +431,6 @@
       moveLock = val;
       const btns = Array.from(document.querySelectorAll('#moveButtons .move-btn'));
       btns.forEach(b => { b.disabled = val; b.classList.toggle('disabled', val); });
-      // also disable switch button
       const sbtn = $('switchBtn');
       if (sbtn) { sbtn.disabled = val; sbtn.classList.toggle('disabled', val); }
     }
@@ -435,14 +453,38 @@
       }
     }
 
+    function getTypeMultiplier(moveType, defenderType) {
+      const move = String(moveType || 'normal').toLowerCase();
+      const def = String(defenderType || 'normal').toLowerCase();
+      const chart = TYPE_CHART[move];
+      if (!chart) return 1;
+      return typeof chart[def] === 'number' ? chart[def] : 1;
+    }
+
     function calcDamage(att, def, mv) {
-      // simple damage formula for gameplay: base power + attack/def factor + randomness
-      const power = mv.power || 40;
-      const atk = att.p.stats.attack || 50;
-      const defStat = def.p.stats.defense || 50;
-      const base = Math.max(1, Math.floor(power * (atk / Math.max(1, defStat))));
-      const rand = 0.85 + Math.random() * 0.3; // 0.85 - 1.15
-      return Math.max(1, Math.floor(base * rand / 10));
+      if (!att || !def || !mv) return 0;
+
+      const level = 50;
+      const power = Number(mv.power) || 40;
+      const attack = Number(att?.p?.stats?.attack) || 50;
+      const defense = Number(def?.p?.stats?.defense) || 50;
+
+      const moveType = String(mv.type || 'normal').toLowerCase();
+      const attackerTypes = Array.isArray(att?.p?.types) ? att.p.types.map(t => String(t).toLowerCase()) : [];
+      const defenderTypes = Array.isArray(def?.p?.types) ? def.p.types.map(t => String(t).toLowerCase()) : [];
+
+      const stab = attackerTypes.includes(moveType) ? 1.5 : 1;
+      let effectiveness = 1;
+      for (const defenderType of defenderTypes) {
+        effectiveness *= getTypeMultiplier(moveType, defenderType);
+      }
+
+      if (effectiveness === 0) return 0;
+
+      const critical = Math.random() < 0.0625 ? 1.5 : 1;
+      const randomFactor = 0.85 + Math.random() * 0.15;
+      const base = Math.floor(((2 * level / 5 + 2) * power * (attack / Math.max(1, defense)) / 50) + 2);
+      return Math.max(1, Math.floor(base * stab * effectiveness * critical * randomFactor));
     }
 
     async function playerUseMove(mv) {
@@ -456,29 +498,24 @@
       await new Promise(r => setTimeout(r, 700));
 
       if (foe.currentHp <= 0) {
-        // enemy faint
         logBattle(`${foe.p.name} fainted!`);
         await new Promise(r => setTimeout(r, 600));
         battle.ei += 1;
         if (battle.ei >= battle.enemy.length) {
-          // player wins
           logBattle(`You defeated ${challenge.trainer}!`);
           showResult(true);
           return;
         } else {
-          // bring in next enemy
           const next = battle.enemy[battle.ei];
           next.currentHp = next.maxHp;
           setupBattleUI();
           disableMoves(false);
-          // enemy also gets a free switch-in turn? we'll let enemy act next
           await new Promise(r => setTimeout(r, 400));
           await enemyTurn();
           return;
         }
       }
 
-      // enemy turn
       await new Promise(r => setTimeout(r, 300));
       await enemyTurn();
     }
@@ -487,9 +524,8 @@
       if (!battle) return;
       const me = battle.player[battle.pi];
       const foe = battle.enemy[battle.ei];
-      // pick random move
       const moves = foe.p._moves || [];
-      const mv = moves[Math.floor(Math.random() * moves.length)] || { name: 'tackle', power: 40 };
+      const mv = moves[Math.floor(Math.random() * moves.length)] || { name: 'tackle', power: 40, type: 'normal' };
       const dmg = calcDamage(foe, me, mv);
       me.currentHp = Math.max(0, me.currentHp - dmg);
       setHpFill($('myHpFill'), me.currentHp / me.maxHp);
@@ -501,12 +537,10 @@
         await new Promise(r => setTimeout(r, 600));
         battle.pi += 1;
         if (battle.pi >= battle.player.length) {
-          // player lost
           logBattle(`You were defeated by ${challenge.trainer}...`);
           showResult(false);
           return;
         } else {
-          // bring in next player pokemon
           const next = battle.player[battle.pi];
           next.currentHp = next.maxHp;
           setupBattleUI();
@@ -515,7 +549,6 @@
         }
       }
 
-      // next round
       battle.round += 1;
       setupBattleUI();
       disableMoves(false);
@@ -527,11 +560,9 @@
       battle = null;
     }
 
-    // SWITCHING LOGIC
     function renderSwitchButton() {
       const btn = $('switchBtn');
       if (!btn) return;
-      // only enable switch if in battle and not moveLocked
       btn.disabled = !battle || moveLock;
       btn.classList.toggle('disabled', !battle || moveLock);
     }
@@ -575,19 +606,16 @@
         alert('Cannot switch to that Pokémon (fainted).');
         return;
       }
-      // perform switch
       disableMoves(true);
       logBattle(`Switching to ${target.p.name}...`);
       await new Promise(r => setTimeout(r, 400));
       battle.pi = ti;
       setupBattleUI();
-      // after switching, enemy gets a turn
       await new Promise(r => setTimeout(r, 300));
       await enemyTurn();
       disableMoves(false);
     }
 
-    // click delegation
     document.addEventListener('click', async (event) => {
       const dexSlot = event.target.closest('#dexGrid .dex-entry');
       if (dexSlot) {
