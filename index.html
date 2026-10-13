@@ -31,6 +31,7 @@
     .moves{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
     .move-btn{padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:#eff5ff;cursor:pointer}
     .controls{display:flex;gap:8px}
+    .disabled{opacity:.5;pointer-events:none}
     @media(max-width:900px){.wrap{grid-template-columns:1fr}.side{width:100%}}
   </style>
 </head>
@@ -153,6 +154,7 @@
     let detailCache = {};
     let challenge = null;
     let battle = null;
+    let moveLock = false;
 
     function saveTeam() {
       localStorage.setItem(storageKeyTeam, JSON.stringify(chosen));
@@ -208,7 +210,7 @@
           sprite: data.sprites?.other?.['official-artwork']?.front_default || data.sprites?.front_default || '',
           types: data.types?.map(t => t.type.name) || [],
           stats: data.stats ? Object.fromEntries(data.stats.map(s => [s.stat.name, s.base_stat])) : {},
-          moves: data.moves?.map(m => m.move.name) || []
+          moveNames: data.moves?.map(m => m.move.name) || []
         };
         detailCache[key] = details;
         detailCache[String(data.id)] = details;
@@ -216,6 +218,33 @@
       } catch (error) {
         return null;
       }
+    }
+
+    async function fetchMove(name) {
+      try {
+        const r = await fetch(`${API}/move/${encodeURIComponent(name)}`);
+        if (!r.ok) throw new Error('move not found');
+        const m = await r.json();
+        return { name: m.name, power: m.power || 40, type: m.type.name, accuracy: m.accuracy || 100, damageClass: m.damage_class.name };
+      } catch (e) {
+        return { name, power: 40, type: 'normal', accuracy: 100, damageClass: 'physical' };
+      }
+    }
+
+    async function ensureMoves(p) {
+      if (!p) return [];
+      if (p._moves && p._moves.length) return p._moves;
+      const names = (p.moveNames || []).slice(0, 8); // try first 8 to choose from
+      const moves = [];
+      for (const n of names) {
+        const mv = await fetchMove(n);
+        moves.push(mv);
+        if (moves.length >= 4) break;
+      }
+      // if still less than 4, add simple defaults
+      while (moves.length < 4) moves.push({ name: 'tackle', power: 40, type: 'normal', accuracy: 100, damageClass: 'physical' });
+      p._moves = moves;
+      return moves;
     }
 
     function renderDexGrid(list) {
@@ -317,6 +346,14 @@
       $('challengeInfo').textContent = `Facing: ${challenge.trainer}`;
     }
 
+    function setHpFill(el, fraction) {
+      el.style.width = Math.max(0, Math.min(100, Math.round(fraction * 100))) + '%';
+    }
+
+    function logBattle(msg) {
+      $('battleLog').textContent = msg;
+    }
+
     async function startBattle() {
       if (chosen.length !== 6) {
         alert('Choose 6 Pokémon first');
@@ -326,24 +363,149 @@
       const player = [];
       for (const id of chosen) {
         const p = await getPokemon(id);
+        await ensureMoves(p);
         player.push({ p, currentHp: 100, maxHp: 100 });
       }
       const enemy = [];
       for (const id of challenge.ids) {
         const p = await getPokemon(id);
+        await ensureMoves(p);
         enemy.push({ p, currentHp: 100, maxHp: 100 });
       }
-      battle = { player, enemy, pi: 0, ei: 0 };
+      battle = { player, enemy, pi: 0, ei: 0, round: 1 };
+      setupBattleUI();
+      showStep('battle');
+      logBattle(`Battle start! ${challenge.trainer} is ready.`);
+    }
+
+    function setupBattleUI() {
+      if (!battle) return;
       const me = battle.player[battle.pi];
       const foe = battle.enemy[battle.ei];
       $('mySprite').src = me.p.sprite || '';
       $('foeSprite').src = foe.p.sprite || '';
       $('myName').textContent = me.p.name;
       $('foeName').textContent = foe.p.name;
-      $('myHpFill').style.width = '100%';
-      $('foeHpFill').style.width = '100%';
-      $('battleLog').textContent = `Battle start! ${challenge.trainer} is ready.`;
-      showStep('battle');
+      setHpFill($('myHpFill'), me.currentHp / me.maxHp);
+      setHpFill($('foeHpFill'), foe.currentHp / foe.maxHp);
+      $('battleRound').textContent = `Round ${battle.round}`;
+      renderMoveButtons();
+    }
+
+    function disableMoves(val) {
+      moveLock = val;
+      const btns = Array.from(document.querySelectorAll('#moveButtons .move-btn'));
+      btns.forEach(b => { b.disabled = val; b.classList.toggle('disabled', val); });
+    }
+
+    async function renderMoveButtons() {
+      const container = $('moveButtons');
+      container.innerHTML = '';
+      if (!battle) return;
+      const me = battle.player[battle.pi];
+      const moves = me.p._moves || [];
+      for (const mv of moves) {
+        const btn = document.createElement('button');
+        btn.className = 'move-btn';
+        btn.textContent = `${mv.name} (${mv.power})`;
+        btn.addEventListener('click', async () => {
+          if (moveLock) return;
+          await playerUseMove(mv);
+        });
+        container.appendChild(btn);
+      }
+    }
+
+    function calcDamage(att, def, mv) {
+      // simple damage formula for gameplay: base power + attack/def factor + randomness
+      const power = mv.power || 40;
+      const atk = att.p.stats.attack || 50;
+      const defStat = def.p.stats.defense || 50;
+      const base = Math.max(1, Math.floor(power * (atk / Math.max(1, defStat))));
+      const rand = 0.85 + Math.random() * 0.3; // 0.85 - 1.15
+      return Math.max(1, Math.floor(base * rand / 10));
+    }
+
+    async function playerUseMove(mv) {
+      disableMoves(true);
+      const me = battle.player[battle.pi];
+      const foe = battle.enemy[battle.ei];
+      const dmg = calcDamage(me, foe, mv);
+      foe.currentHp = Math.max(0, foe.currentHp - dmg);
+      setHpFill($('foeHpFill'), foe.currentHp / foe.maxHp);
+      logBattle(`${me.p.name} used ${mv.name} and dealt ${dmg} damage!`);
+      await new Promise(r => setTimeout(r, 700));
+
+      if (foe.currentHp <= 0) {
+        // enemy faint
+        logBattle(`${foe.p.name} fainted!`);
+        await new Promise(r => setTimeout(r, 600));
+        battle.ei += 1;
+        if (battle.ei >= battle.enemy.length) {
+          // player wins
+          logBattle(`You defeated ${challenge.trainer}!`);
+          showResult(true);
+          return;
+        } else {
+          // bring in next enemy
+          const next = battle.enemy[battle.ei];
+          next.currentHp = next.maxHp;
+          setupBattleUI();
+          disableMoves(false);
+          // enemy also gets a free switch-in turn? we'll let enemy act next
+          await new Promise(r => setTimeout(r, 400));
+          await enemyTurn();
+          return;
+        }
+      }
+
+      // enemy turn
+      await new Promise(r => setTimeout(r, 300));
+      await enemyTurn();
+    }
+
+    async function enemyTurn() {
+      if (!battle) return;
+      const me = battle.player[battle.pi];
+      const foe = battle.enemy[battle.ei];
+      // pick random move
+      const moves = foe.p._moves || [];
+      const mv = moves[Math.floor(Math.random() * moves.length)] || { name: 'tackle', power: 40 };
+      const dmg = calcDamage(foe, me, mv);
+      me.currentHp = Math.max(0, me.currentHp - dmg);
+      setHpFill($('myHpFill'), me.currentHp / me.maxHp);
+      logBattle(`${foe.p.name} used ${mv.name} and dealt ${dmg} damage!`);
+      await new Promise(r => setTimeout(r, 700));
+
+      if (me.currentHp <= 0) {
+        logBattle(`${me.p.name} fainted!`);
+        await new Promise(r => setTimeout(r, 600));
+        battle.pi += 1;
+        if (battle.pi >= battle.player.length) {
+          // player lost
+          logBattle(`You were defeated by ${challenge.trainer}...`);
+          showResult(false);
+          return;
+        } else {
+          // bring in next player pokemon
+          const next = battle.player[battle.pi];
+          next.currentHp = next.maxHp;
+          setupBattleUI();
+          disableMoves(false);
+          return;
+        }
+      }
+
+      // next round
+      battle.round += 1;
+      setupBattleUI();
+      disableMoves(false);
+    }
+
+    function showResult(playerWon) {
+      $('resultSummary').textContent = playerWon ? 'Victory!' : 'Defeat.';
+      showStep('result');
+      battle = null;
     }
 
     document.addEventListener('click', async (event) => {
