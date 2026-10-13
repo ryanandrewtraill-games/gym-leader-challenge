@@ -13,12 +13,14 @@
     .wrap{max-width:1100px;margin:18px auto;display:grid;grid-template-columns:1fr 320px;gap:16px;padding:0 12px}
     main{min-width:0}.panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px}
     .step-hidden{display:none}
-    .dex-tools{display:flex;gap:8px;margin:10px 0}
+    .dex-tools{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
     .dex-tools input,.dex-tools select,.dex-tools button{padding:8px;border:1px solid var(--line);border-radius:8px}
+    .dex-tools input{flex:1 1 220px}
     .dex-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;max-height:420px;overflow:auto;padding:6px}
-    .dex-entry{border:1px solid var(--line);border-radius:10px;padding:8px;text-align:center;cursor:pointer;background:#fff}
+    .dex-entry{border:1px solid var(--line);border-radius:10px;padding:8px;text-align:center;cursor:pointer;background:#fff;transition:.12s ease}
+    .dex-entry:hover{border-color:var(--blue)}
     .dex-entry.selected{background:#ecfbf4;border-color:var(--green)}
-    .poke-card img{width:64px;height:64px;object-fit:contain}
+    .dex-entry .mini{width:64px;height:64px;object-fit:contain;display:block;margin:0 auto 6px}
     .battle-stage{display:flex;gap:12px;align-items:center;justify-content:space-between;position:relative}
     .side{width:48%;text-align:center}
     .sprite-wrap{height:160px;display:flex;align-items:center;justify-content:center}
@@ -50,17 +52,22 @@
 
         <div class="dex-tools">
           <input id="dexSearch" placeholder="Type name or ID and press Enter or Search" aria-label="Search">
-          <select id="genFilter"><option value="all">All gens</option><option value="1">Gen I</option><option value="2">Gen II</option><option value="3">Gen III</option></select>
+          <select id="genFilter">
+            <option value="all">All Gen I–III</option>
+            <option value="1">Gen I</option>
+            <option value="2">Gen II</option>
+            <option value="3">Gen III</option>
+          </select>
           <button id="dexSearchBtn">Search</button>
           <button id="clearDexBtn">Clear</button>
         </div>
-        <div id="dexGrid" class="dex-grid"><div style="grid-column:1/-1;color:var(--muted);padding:12px">Search for a Pokémon by name or ID to add it to the picker. The list starts empty.</div></div>
+        <div id="dexGrid" class="dex-grid"></div>
         <div style="margin-top:12px"><h3 style="margin:6px 0">Selected team (click to remove)</h3><div id="teamCards" class="dex-grid" style="grid-template-columns:repeat(3,1fr)"></div></div>
       </section>
 
       <section class="panel step-hidden" id="challengePanel">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h2 style="margin:0">⚔️ Challenger</h2><div><button id="startBtn" class="primary" style="background:var(--blue);color:#fff;border-radius:8px;padding:8px 10px">Start battle</button></div></div>
-        <div id="challengeInfo" style="color:var(--muted);margin-bottom:8px">Your daily challenge is ready.</div>
+        <div id="challengeInfo" style="color:var(--muted);margin-bottom:8px">Your challenge is ready.</div>
         <div id="previewEnemy" class="dex-grid"></div>
       </section>
 
@@ -101,6 +108,31 @@
   <script>
     const API = 'https://pokeapi.co/api/v2';
     const $ = id => document.getElementById(id);
+    const typeColors = {
+      normal:'#A8A77A', fire:'#EE8130', water:'#6390F0', electric:'#F7D02C', grass:'#7AC74C', ice:'#96D9D6',
+      fighting:'#C22E28', poison:'#A33EA1', ground:'#E2BF65', flying:'#A98FF3', psychic:'#F95587', bug:'#A6B91A',
+      rock:'#B6A136', ghost:'#735797', dragon:'#6F35FC', dark:'#705746', steel:'#B7B7CE', fairy:'#D685AD'
+    };
+    const typeChart = {
+      normal:{rock:0.5, ghost:0, steel:0.5},
+      fire:{fire:0.5, water:0.5, grass:2, ice:2, bug:2, rock:0.5, dragon:0.5, steel:2},
+      water:{fire:2, water:0.5, grass:0.5, ground:2, rock:2, dragon:0.5},
+      electric:{water:2, electric:0.5, grass:0.5, ground:0, flying:2, dragon:0.5},
+      grass:{fire:0.5, water:2, grass:0.5, poison:0.5, ground:2, flying:0.5, bug:0.5, rock:2, dragon:0.5, steel:0.5},
+      ice:{fire:0.5, water:0.5, grass:2, ice:0.5, ground:2, flying:2, dragon:2, steel:0.5},
+      fighting:{normal:2, ice:2, poison:0.5, flying:0.5, psychic:0.5, bug:0.5, rock:2, ghost:0, dark:2, steel:2},
+      poison:{grass:2, poison:0.5, ground:0.5, rock:0.5, ghost:0.5, steel:0},
+      ground:{fire:2, electric:2, grass:0.5, poison:2, flying:0, bug:0.5, rock:2, steel:2},
+      flying:{electric:0.5, grass:2, fighting:2, bug:2, rock:0.5, steel:0.5},
+      psychic:{fighting:2, poison:2, psychic:0.5, dark:0, steel:0.5},
+      bug:{fire:0.5, grass:2, fighting:0.5, poison:0.5, flying:0.5, psychic:2, ghost:0.5, dark:2, steel:0.5},
+      rock:{fire:2, ice:2, fighting:0.5, ground:0.5, flying:2, bug:2, steel:0.5},
+      ghost:{normal:0, psychic:0.5, ghost:2, dark:0.5},
+      dragon:{dragon:2, steel:0.5},
+      dark:{fighting:0.5, psychic:2, ghost:2},
+      steel:{fire:0.5, water:0.5, electric:0.5, ice:2, rock:2, steel:0.5, fairy:2},
+      fairy:{fire:0.5, fighting:2, poison:0.5, dragon:2, dark:2, steel:0.5}
+    };
 
     function safeParse(v, f){ if (v==null||v==='') return f; try{return JSON.parse(v)}catch(e){return f} }
     const today = ()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
@@ -133,109 +165,174 @@
 
     function maxHP(p){ return Math.max(20, Math.floor((2*(p.stats?.hp||50)+31+63)*100/100)+100+10) }
 
-    async function getPokemon(idOrName){ if(detailCache[idOrName]) return detailCache[idOrName];
-      try{ const r=await fetch(API+'/pokemon/'+idOrName); if(!r.ok) throw 0; const p=await r.json(); const moves = p.moves.map(m=>m.move.name).slice(0,6); const obj={id:p.id,name:p.name,sprite:p.sprites?.front_default||'',types:p.types.map(t=>t.type.name),stats:Object.fromEntries(p.stats.map(s=>[s.stat.name,s.base_stat])),moveNames:moves}; detailCache[p.id]=obj; detailCache[p.name]=obj; return obj }catch(e){ throw e } }
+    function normalizeChoiceList(list){
+      const arr = Array.isArray(list) ? list : [];
+      return arr.filter((v,i,a)=>Number.isFinite(Number(v)) && a.indexOf(v)===i).map(Number).slice(0,6);
+    }
 
-    async function moveInfo(name){ try{ const r=await fetch(API+'/move/'+name); if(!r.ok) throw 0; const m=await r.json(); return {name:m.name,power:m.power||40,type:m.type.name,accuracy:m.accuracy||100,damageClass:m.damage_class?.name||'physical'} }catch(e){ return {name, power:40, type:'normal', accuracy:100, damageClass:'physical'} } }
+    async function getPokemon(idOrName){
+      const cacheKey = String(idOrName).toLowerCase();
+      if(detailCache[cacheKey]) return detailCache[cacheKey];
+      const lookup = Number(idOrName) || idOrName;
+      try {
+        const r = await fetch(API+'/pokemon/'+lookup); if(!r.ok) throw 0;
+        const p = await r.json();
+        const obj = {
+          id:p.id,
+          name:p.name,
+          sprite:p.sprites?.front_default || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`,
+          types:p.types.map(t=>t.type.name),
+          stats:Object.fromEntries(p.stats.map(s=>[s.stat.name,s.base_stat])),
+          moveNames:p.moves.slice(0,8).map(m=>m.move.name)
+        };
+        detailCache[p.id] = obj;
+        detailCache[p.name.toLowerCase()] = obj;
+        return obj;
+      } catch (e){
+        return null;
+      }
+    }
+
+    async function moveInfo(name){
+      try {
+        const r = await fetch(API+'/move/'+name); if(!r.ok) throw 0;
+        const m=await r.json();
+        return {name:m.name,power:m.power||40,type:m.type.name,accuracy:m.accuracy||100,damageClass:m.damage_class?.name||'physical'};
+      } catch(e){
+        return {name, power:40, type:'normal', accuracy:100, damageClass:'physical'};
+      }
+    }
 
     async function ensureMoves(p){
       if(!p) return [];
       if(p.moves && p.moves.length) return p.moves;
       p.moves = [];
       const names = (p.moveNames || []).slice(0,4);
-      for(const name of names){ p.moves.push(await moveInfo(name)); }
-      if(p.moves.length===0){ p.moves.push({name:'Struggle',power:50,type:'normal',accuracy:100,damageClass:'physical'}); }
+      for (const name of names) p.moves.push(await moveInfo(name));
+      if (!p.moves.length) p.moves.push({name:'Struggle',power:50,type:'normal',accuracy:100,damageClass:'physical'});
       return p.moves;
     }
 
-    async function searchPokemon(q){
-      if(!q || !q.trim()) return;
-      const term=q.trim().toLowerCase();
-      try{
-        $('dexGrid').innerHTML='<div style="grid-column:1/-1;padding:8px;color:var(--muted)">Searching…</div>';
-        const p = await getPokemon(term);
-        renderSearchResults([p]);
-      }catch(e){
-        $('dexGrid').innerHTML='<div style="grid-column:1/-1;padding:8px;color:var(--muted)">Not found</div>';
-      }
+    function buildDexRange(gen){
+      if (gen === '1') return Array.from({length:151},(_,i)=>i+1);
+      if (gen === '2') return Array.from({length:100},(_,i)=>i+152);
+      if (gen === '3') return Array.from({length:135},(_,i)=>i+252);
+      return Array.from({length:386},(_,i)=>i+1);
     }
 
-    function renderSearchResults(list){
-      $('dexGrid').innerHTML = list.map(p=>`<div class="dex-entry ${chosen.includes(p.id)?'selected':''}" data-id="${p.id}"><img src="${p.sprite||''}" alt="${p.name}" style="width:64px;height:64px"><div style="text-transform:capitalize">${p.name}</div><small>#${p.id}</small></div>`).join('');
+    function renderDexGrid(list){
+      const items = list || [];
+      $('dexGrid').innerHTML = items.map(id => {
+        const p = detailCache[id] || null;
+        const selected = chosen.includes(Number(id));
+        const sprite = p?.sprite || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+        const label = p?.name || 'Loading…';
+        return `<div class="dex-entry ${selected?'selected':''}" data-id="${id}"><img class="mini" src="${sprite}" alt="${label}"><div style="text-transform:capitalize;line-height:1.2">${label}</div><small>#${id}</small></div>`;
+      }).join('');
+    }
+
+    async function refreshDexDisplay(){
+      const gen = $('genFilter').value || 'all';
+      const q = $('dexSearch').value.trim().toLowerCase();
+      let list = buildDexRange(gen);
+      if (q) {
+        const matches = [];
+        for (const id of list) {
+          const p = detailCache[id] || await getPokemon(id).catch(()=>null);
+          if (p && (p.name.includes(q) || String(p.id).includes(q))) matches.push(id);
+        }
+        list = matches.slice(0, 100);
+      }
+      renderDexGrid(list);
     }
 
     function renderSelected(){
-      const team = Array.from({length:6},(_,i)=>detailCache[chosen[i]]||null);
-      $('teamCards').innerHTML = team.map(p=>p?`<div class="dex-entry selected" data-id="${p.id}"><img src="${p.sprite||''}" style="width:64px;height:64px"><div style="text-transform:capitalize">${p.name}</div><small>#${p.id}</small></div>`:'<div class="dex-entry" style="opacity:.6">Empty</div>').join('');
-      $('continueBtn').disabled = chosen.length!==6;
-      $('teamNote').textContent = chosen.length===6 ? 'Your team is ready.' : 'Pick 6 Pokémon for your Gym.';
+      const team = Array.from({length:6},(_,i)=>chosen[i] || null);
+      $('teamCards').innerHTML = team.map(id => {
+        if (!id) return '<div class="dex-entry" style="opacity:.6">Empty</div>';
+        const p = detailCache[id] || null;
+        const sprite = p?.sprite || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+        const label = p?.name || `#${id}`;
+        return `<div class="dex-entry selected" data-id="${id}"><img class="mini" src="${sprite}" alt="${label}"><div style="text-transform:capitalize">${label}</div><small>#${id}</small></div>`;
+      }).join('');
+      $('continueBtn').disabled = chosen.length !== 6;
+      $('teamNote').textContent = chosen.length === 6 ? 'Your team is ready.' : `Pick ${6 - chosen.length} more Pokémon for your Gym.`;
     }
 
-    // click handling: clicking a search result adds immediately; clicking a selected team slot removes it
-    document.addEventListener('click', async e=>{
-      const searchSlot = e.target.closest('#dexGrid .dex-entry');
-      if(searchSlot){
-        const id = Number(searchSlot.dataset.id);
-        if(!id) return;
-        if(!chosen.includes(id)){
-          if(chosen.length >= 6){ alert('Team is full — remove a Pokémon from Selected team if you want to change it'); return; }
-          chosen.push(id);
-          saveState();
-          renderSelected();
-          renderSearchResults(Object.values(detailCache).filter(v=>v && v.id));
+    function toggleSelected(id){
+      const num = Number(id);
+      if (!num) return;
+      if (chosen.includes(num)) {
+        chosen = chosen.filter(x => x !== num);
+      } else {
+        if (chosen.length >= 6) {
+          alert('Your team is full — click a selected Pokémon to remove it first.');
+          return;
         }
+        chosen.push(num);
+      }
+      chosen = normalizeChoiceList(chosen);
+      saveState();
+      renderSelected();
+      refreshDexDisplay();
+    }
+
+    document.addEventListener('click', async (e) => {
+      const dexSlot = e.target.closest('#dexGrid .dex-entry');
+      if (dexSlot) {
+        const id = Number(dexSlot.dataset.id);
+        if (!id) return;
+        if (!detailCache[id]) await getPokemon(id).catch(()=>null);
+        toggleSelected(id);
         return;
       }
       const teamSlot = e.target.closest('#teamCards .dex-entry');
-      if(teamSlot){
+      if (teamSlot) {
         const id = Number(teamSlot.dataset.id);
-        if(!id) return;
-        chosen = chosen.filter(x=>x!==id);
-        saveState();
-        renderSelected();
-        renderSearchResults(Object.values(detailCache).filter(v=>v && v.id));
-        return;
+        if (!id) return;
+        toggleSelected(id);
       }
     });
 
-    $('dexSearchBtn').addEventListener('click', ()=>searchPokemon($('dexSearch').value));
-    $('dexSearch').addEventListener('keydown', e=>{ if(e.key==='Enter') searchPokemon($('dexSearch').value) })
-    $('clearDexBtn').addEventListener('click', ()=>{ $('dexGrid').innerHTML='<div style="grid-column:1/-1;color:var(--muted);padding:12px">Search for a Pokémon by name or ID to add it to the picker. The list starts empty.</div>'; });
+    $('dexSearchBtn').addEventListener('click', async () => { await refreshDexDisplay(); });
+    $('dexSearch').addEventListener('keydown', async (e) => { if (e.key === 'Enter') await refreshDexDisplay(); });
+    $('genFilter').addEventListener('change', async () => { await refreshDexDisplay(); });
+    $('clearDexBtn').addEventListener('click', () => { $('dexSearch').value=''; $('genFilter').value='all'; refreshDexDisplay(); });
 
-    // pick 6 random Pokémon from gen 1-3 for the rival
-    function shuffle(array){ for(let i=array.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [array[i],array[j]]=[array[j],array[i]] } return array }
+    function shuffle(array){ for(let i=array.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [array[i],array[j]]=[array[j],array[i]]; } return array; }
 
     async function makeChallenge(){
-      // full gen1-3 pool (1..386)
       const pool = Array.from({length:386},(_,i)=>i+1);
-      shuffle(pool);
-      const ids = pool.slice(0,6);
+      const ids = shuffle(pool).slice(0,6);
       const trainer = ['Blue','Red','Lance','Leaf','Giovanni','Steven'][Math.floor(Math.random()*6)];
-      challenge = {trainer, ids};
-      // ensure details
-      try{
-        await Promise.all(ids.map(id=>getPokemon(id).catch(()=>null)));
-        $('challengeInfo').textContent = trainer + ' is challenging your Gym.';
-        renderChallengePreview();
-      }catch(e){ $('challengeInfo').textContent = 'Unable to load challenge data. Try reloading.'; }
+      challenge = { trainer, ids };
+      for (const id of ids) await getPokemon(id).catch(()=>null);
+      $('challengeInfo').textContent = trainer + ' is challenging your Gym.';
+      renderChallengePreview();
     }
 
     function renderChallengePreview(){
       if(!challenge) return;
-      $('previewEnemy').innerHTML = challenge.ids.map(id=>{
+      $('previewEnemy').innerHTML = challenge.ids.map(id => {
         const p = detailCache[id];
         if(!p) return '<div style="opacity:.6">Loading…</div>';
-        return `<div class="dex-entry"><img src="${p.sprite||''}" style="width:64px;height:64px"><div style="text-transform:capitalize">${p.name}</div><small>#${p.id}</small></div>`;
+        return `<div class="dex-entry"><img class="mini" src="${p.sprite||''}" alt="${p.name}"><div style="text-transform:capitalize">${p.name}</div><small>#${p.id}</small></div>`;
       }).join('');
     }
 
     function setHpFill(el, fraction){ el.style.width = Math.max(0, Math.min(100, Math.round(fraction*100))) + '%' }
 
+    function getTypeMultiplier(moveType, defenderTypes){
+      if (!moveType || !defenderTypes || !defenderTypes.length) return 1;
+      return defenderTypes.reduce((total, type) => total * (typeChart[moveType]?.[type] ?? 1), 1);
+    }
+
     function damageCalc(att, def, mv){
       const power = mv.power || 40;
       const atkStat = (mv.damageClass === 'special' ? (att.stats?.['special-attack'] ?? 50) : (att.stats?.attack ?? 50));
       const defStat = (mv.damageClass === 'special' ? (def.stats?.['special-defense'] ?? 50) : (def.stats?.defense ?? 50));
-      return Math.max(8, Math.floor(power * (atkStat / Math.max(10, defStat)))) + 4;
+      const multiplier = getTypeMultiplier(mv.type, def.types || []);
+      return Math.max(8, Math.floor(power * (atkStat / Math.max(10, defStat)) * multiplier)) + 4;
     }
 
     function createDamageFx(text, x, y){
@@ -247,15 +344,30 @@
 
     function animateMove(attEl, defEl){ return new Promise(res=>{ if(!attEl || !defEl){ setTimeout(res,200); return; } attEl.classList.add('anim-forward'); setTimeout(()=>{ attEl.classList.remove('anim-forward'); defEl.classList.add('anim-shake'); setTimeout(()=>{ defEl.classList.remove('anim-shake'); res(); },300); },320); }) }
 
+    function getNextAliveIndex(team, startIndex){
+      for (let i = startIndex; i < team.length; i++) if (team[i] && team[i].currentHp > 0) return i;
+      return -1;
+    }
+
     async function startBattle(){
-      if(chosen.length!==6) return alert('Pick 6 Pokémon first');
-      const myTeam = chosen.map(id => detailCache[id]).filter(Boolean).map(p => ({p, currentHp: maxHP(p)}));
-      const foeTeam = (challenge ? challenge.ids.map(id => detailCache[id]).filter(Boolean) : []).map(p => ({p, currentHp: maxHP(p)}));
-      if(!myTeam.length || !foeTeam.length) return alert('Challenge team not ready. Try again.');
-      for(const x of myTeam) await ensureMoves(x.p);
-      for(const x of foeTeam) await ensureMoves(x.p);
-      battle = {player:myTeam, enemy:foeTeam, pi:0, ei:0};
-      $('battleLog').textContent='The battle begins!';
+      if (chosen.length !== 6) return alert('Pick 6 Pokémon first');
+      const playerIds = chosen.slice(0,6);
+      const foeIds = challenge ? challenge.ids.slice(0,6) : [];
+      const myTeam = [];
+      const foeTeam = [];
+      for (const id of playerIds) {
+        const p = await getPokemon(id).catch(()=>null);
+        if (p) myTeam.push({ p, currentHp: maxHP(p) });
+      }
+      for (const id of foeIds) {
+        const p = await getPokemon(id).catch(()=>null);
+        if (p) foeTeam.push({ p, currentHp: maxHP(p) });
+      }
+      if (myTeam.length < 1 || foeTeam.length < 1) return alert('Could not load the battle teams. Try again.');
+      for (const slot of myTeam) await ensureMoves(slot.p);
+      for (const slot of foeTeam) await ensureMoves(slot.p);
+      battle = { player: myTeam, enemy: foeTeam, pi: getNextAliveIndex(myTeam, 0), ei: getNextAliveIndex(foeTeam, 0) };
+      $('battleLog').textContent = 'The battle begins!';
       updateBattleDisplay();
       showStep('battle');
     }
@@ -290,48 +402,64 @@
       if(!mvBtn || !battle || moveLock) return;
       moveLock = true;
       const idx = Number(mvBtn.dataset.move);
-      const me = battle.player[battle.pi];
-      const foe = battle.enemy[battle.ei];
+      let me = battle.player[battle.pi];
+      let foe = battle.enemy[battle.ei];
       if(!me || !foe){ moveLock=false; return; }
-      const mv = (me.p.moves || [])[idx] || {name:'Tackle', power:40, damageClass:'physical'};
+      const mv = (me.p.moves || [])[idx] || {name:'Tackle', power:40, type:'normal', damageClass:'physical'};
       await animateMove($('mySprite'), $('foeSprite'));
+      const multiplier = getTypeMultiplier(mv.type, foe.p.types || []);
       const dmg = damageCalc(me.p, foe.p, mv);
       foe.currentHp = Math.max(0, foe.currentHp - dmg);
+      let logText = `${me.p.name} used ${mv.name}! It dealt ${dmg} damage.`;
+      if (multiplier > 1) logText += ' It was super effective!';
+      if (multiplier < 1 && multiplier > 0) logText += ' It was not very effective.';
       const rect = $('foeSprite').getBoundingClientRect();
       createDamageFx('-'+dmg, rect.left + rect.width/2, rect.top + 20);
       setHpFill($('foeHpFill'), foe.currentHp / maxHP(foe.p));
-      $('battleLog').textContent = `${me.p.name} used ${mv.name}! It dealt ${dmg} damage.`;
-      if(foe.currentHp <= 0){
+      $('battleLog').textContent = logText;
+
+      if (foe.currentHp <= 0) {
         $('foeSprite').classList.add('faint');
         await new Promise(r => setTimeout(r, 500));
-        battle.ei += 1;
-        if(battle.ei >= battle.enemy.length){
+        const nextE = getNextAliveIndex(battle.enemy, battle.ei + 1);
+        if (nextE === -1) {
           finishBattle(true);
           moveLock=false;
           return;
         }
+        battle.ei = nextE;
         $('foeSprite').classList.remove('faint');
         updateBattleDisplay();
       }
 
       await new Promise(r => setTimeout(r, 200));
-      const foeMove = (foe.p.moves || [])[Math.floor(Math.random() * (foe.p.moves || []).length)] || {name:'Tackle', power:40, damageClass:'physical'};
+      me = battle.player[battle.pi];
+      foe = battle.enemy[battle.ei];
+      if (!me || !foe) { moveLock=false; return; }
+      const foeMoves = foe.p.moves || [{name:'Tackle', power:40, type:'normal', damageClass:'physical'}];
+      const foeMove = foeMoves[Math.floor(Math.random() * foeMoves.length)] || {name:'Tackle', power:40, type:'normal', damageClass:'physical'};
       await animateMove($('foeSprite'), $('mySprite'));
+      const foeMult = getTypeMultiplier(foeMove.type, me.p.types || []);
       const dmg2 = damageCalc(foe.p, me.p, foeMove);
       me.currentHp = Math.max(0, me.currentHp - dmg2);
+      let log2 = `${foe.p.name} used ${foeMove.name}! It dealt ${dmg2} damage.`;
+      if (foeMult > 1) log2 += ' It was super effective!';
+      if (foeMult < 1 && foeMult > 0) log2 += ' It was not very effective.';
       const rect2 = $('mySprite').getBoundingClientRect();
       createDamageFx('-'+dmg2, rect2.left + rect2.width/2, rect2.top + 20);
       setHpFill($('myHpFill'), me.currentHp / maxHP(me.p));
-      $('battleLog').textContent += `\n${foe.p.name} used ${foeMove.name}! It dealt ${dmg2} damage.`;
-      if(me.currentHp <= 0){
+      $('battleLog').textContent += `\n${log2}`;
+
+      if (me.currentHp <= 0) {
         $('mySprite').classList.add('faint');
         await new Promise(r => setTimeout(r, 500));
-        battle.pi += 1;
-        if(battle.pi >= battle.player.length){
+        const nextP = getNextAliveIndex(battle.player, battle.pi + 1);
+        if (nextP === -1) {
           finishBattle(false);
           moveLock=false;
           return;
         }
+        battle.pi = nextP;
         $('mySprite').classList.remove('faint');
         updateBattleDisplay();
       }
@@ -341,17 +469,18 @@
     function tick(){ const n=new Date(), end=new Date(n); end.setHours(24,0,0,0); const s=Math.max(0,Math.floor((end-n)/1000)); $('countdown').textContent = [Math.floor(s/3600),Math.floor(s%3600/60),s%60].map(v=>String(v).padStart(2,'0')).join(':'); }
 
     $('continueBtn').addEventListener('click', async ()=>{ if(chosen.length!==6) return alert('Choose 6 Pokémon first'); await makeChallenge(); showStep('challenge'); });
-    $('startBtn').addEventListener('click', ()=>startBattle());
+    $('startBtn').addEventListener('click', async ()=>{ await startBattle(); });
     $('backToTeamBtn').addEventListener('click', ()=>showStep('team'));
     $('newChallengeBtn').addEventListener('click', async ()=>{ await makeChallenge(); showStep('challenge'); });
 
-    (function init(){
-      chosen = Array.isArray(chosen) ? chosen.slice(0,6) : [];
+    (async function init(){
+      chosen = normalizeChoiceList(chosen);
       stats = {...defaultStats, ...stats};
       daily = daily && typeof daily === 'object' ? daily : {};
       updateStatsUI();
       renderSelected();
-      makeChallenge();
+      await refreshDexDisplay();
+      await makeChallenge();
       tick();
       setInterval(tick,1000);
     })();
