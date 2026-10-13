@@ -635,9 +635,7 @@
     let battleMessageTimer = null;
     let typeCache = {};
 
-    function saveTeam() {
-      localStorage.setItem(storageKeyTeam, JSON.stringify(chosen));
-    }
+    function saveTeam() { localStorage.setItem(storageKeyTeam, JSON.stringify(chosen)); }
 
     function normalizeChoiceList(list) {
       const arr = Array.isArray(list) ? list : [];
@@ -942,6 +940,13 @@
       return mult;
     }
 
+    function describeTypeEffect(multiplier) {
+      if (multiplier === 0) return 'It was immune!';
+      if (multiplier > 1) return 'It was super effective!';
+      if (multiplier < 1) return 'It was not very effective...';
+      return 'It was a normal hit.';
+    }
+
     async function calcDamage(att, def, mv) {
       const power = mv.power || 40;
       const atk = att.p.stats.attack || 50;
@@ -951,7 +956,8 @@
       const stab = (att.p.types || []).includes(mv.type) ? 1.5 : 1;
       const eff = await getTypeMultiplier(mv.type, def.p.types || []);
       const raw = base * rand * stab * eff;
-      return Math.max(1, Math.floor(raw / 10));
+      const damage = Math.max(1, Math.floor(raw / 10));
+      return { damage, effectText: describeTypeEffect(eff) };
     }
 
     function setupBattleUI() {
@@ -1050,12 +1056,12 @@
       const foe = battle.enemy[battle.ei];
       if (!me || !foe) return;
 
-      const dmg = await calcDamage(me, foe, mv);
-      foe.currentHp = Math.max(0, foe.currentHp - dmg);
+      const { damage, effectText } = await calcDamage(me, foe, mv);
+      foe.currentHp = Math.max(0, foe.currentHp - damage);
       setHpFill($('foeHpFill'), foe.currentHp / foe.maxHp, 'health');
       setHpText('foeHpText', foe.currentHp, foe.maxHp);
-      logBattle(`${me.p.name} used ${mv.name} and dealt ${dmg} damage!`);
-      animateHit('foeSprite', dmg);
+      logBattle(`${me.p.name} used ${mv.name} and dealt ${damage} damage! ${effectText}`);
+      animateHit('foeSprite', damage);
       await new Promise(r => setTimeout(r, 700));
 
       if (foe.currentHp <= 0) {
@@ -1091,12 +1097,12 @@
 
       const moves = foe.p._moves || [];
       const mv = moves[Math.floor(Math.random() * moves.length)] || { name: 'tackle', power: 40, type: 'normal' };
-      const dmg = await calcDamage(foe, me, mv);
-      me.currentHp = Math.max(0, me.currentHp - dmg);
+      const { damage, effectText } = await calcDamage(foe, me, mv);
+      me.currentHp = Math.max(0, me.currentHp - damage);
       setHpFill($('myHpFill'), me.currentHp / me.maxHp, 'health');
       setHpText('myHpText', me.currentHp, me.maxHp);
-      logBattle(`${foe.p.name} used ${mv.name} and dealt ${dmg} damage!`);
-      animateHit('mySprite', dmg);
+      logBattle(`${foe.p.name} used ${mv.name} and dealt ${damage} damage! ${effectText}`);
+      animateHit('mySprite', damage);
       await new Promise(r => setTimeout(r, 700));
 
       if (me.currentHp <= 0) {
