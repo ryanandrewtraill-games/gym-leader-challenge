@@ -34,7 +34,7 @@
     .disabled{opacity:.5;pointer-events:none}
 
     /* switch panel */
-    .switch-panel{position:absolute;left:50%;top:60%;transform:translate(-50%,0);background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;z-index:50;box-shadow:0 6px 18px rgba([..])}
+    .switch-panel{position:absolute;left:50%;top:60%;transform:translate(-50%,0);background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;z-index:50;box-shadow:0 6px 18px rgba([...])}
     .switch-grid{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
     .switch-slot{width:90px;text-align:center;border:1px solid var(--line);padding:6px;border-radius:8px;cursor:pointer;background:#fff}
     .switch-slot.disabled{opacity:.5;pointer-events:none}
@@ -230,6 +230,29 @@
       btn.style.cursor = isReady ? 'pointer' : 'not-allowed';
     }
 
+    // Compute Pokémon stats at a given level (simple IV=31, EV=0 model)
+    function computeStatsAtLevel(baseStats, level = 100) {
+      // baseStats: { hp, attack, defense, 'special-attack', 'special-defense', speed }
+      const hpBase = Number(baseStats.hp || baseStats['hp'] || 1);
+      const atkBase = Number(baseStats.attack || baseStats['attack'] || 1);
+      const defBase = Number(baseStats.defense || baseStats['defense'] || 1);
+      const spABase = Number(baseStats['special-attack'] || baseStats['special-attack'] || baseStats['special'] || 1);
+      const spDBase = Number(baseStats['special-defense'] || baseStats['special-defense'] || baseStats['special'] || 1);
+      const spdBase = Number(baseStats.speed || baseStats['speed'] || 1);
+
+      const IV = 31;
+      const EV = 0;
+
+      const hp = Math.floor(((hpBase * 2 + IV + Math.floor(EV / 4)) * level) / 100) + level + 10;
+      const atk = Math.floor(((atkBase * 2 + IV + Math.floor(EV / 4)) * level) / 100) + 5;
+      const def = Math.floor(((defBase * 2 + IV + Math.floor(EV / 4)) * level) / 100) + 5;
+      const spA = Math.floor(((spABase * 2 + IV + Math.floor(EV / 4)) * level) / 100) + 5;
+      const spD = Math.floor(((spDBase * 2 + IV + Math.floor(EV / 4)) * level) / 100) + 5;
+      const spd = Math.floor(((spdBase * 2 + IV + Math.floor(EV / 4)) * level) / 100) + 5;
+
+      return { hp, attack: atk, defense: def, 'special-attack': spA, 'special-defense': spD, speed: spd };
+    }
+
     async function getPokemon(idOrName) {
       const key = String(idOrName).toLowerCase();
       if (detailCache[key]) return detailCache[key];
@@ -403,6 +426,7 @@
       return array;
     }
 
+    // Use level-100 stats for battle and set HP properly
     async function makeChallenge() {
       const pool = buildDexRange('all');
       const ids = shuffle(pool).slice(0, 6);
@@ -442,13 +466,16 @@
       for (const id of chosen) {
         const p = await getPokemon(id);
         await ensureMoves(p);
-        player.push({ p, currentHp: 100, maxHp: 100 });
+        // compute level-100 stats
+        p._computedStats = computeStatsAtLevel(p.stats, 100);
+        player.push({ p, currentHp: p._computedStats.hp, maxHp: p._computedStats.hp });
       }
       const enemy = [];
       for (const id of challenge.ids) {
         const p = await getPokemon(id);
         await ensureMoves(p);
-        enemy.push({ p, currentHp: 100, maxHp: 100 });
+        p._computedStats = computeStatsAtLevel(p.stats, 100);
+        enemy.push({ p, currentHp: p._computedStats.hp, maxHp: p._computedStats.hp });
       }
       battle = { player, enemy, pi: 0, ei: 0, round: 1 };
       setupBattleUI();
@@ -517,13 +544,22 @@
       return { multiplier, details };
     }
 
+    // Use correct stat (physical/special) and level-100 computed stats
     function calcDamage(att, def, mv) {
       if (!att || !def || !mv) return 0;
 
-      const level = 50;
+      const level = 100; // we compute stats at level 100
       const power = Number(mv.power) || 40;
-      const attack = Number(att?.p?.stats?.attack) || 50;
-      const defense = Number(def?.p?.stats?.defense) || 50;
+
+      // Determine whether move is physical or special
+      const damageClass = String(mv.damageClass || mv.damage_class || 'physical').toLowerCase();
+      const isSpecial = damageClass === 'special';
+
+      const attackStatName = isSpecial ? 'special-attack' : 'attack';
+      const defenseStatName = isSpecial ? 'special-defense' : 'defense';
+
+      const attack = Number(att?.p?._computedStats?.[attackStatName] || att?.p?.stats?.[attackStatName] || att?.p?.stats?.attack) || 50;
+      const defense = Number(def?.p?._computedStats?.[defenseStatName] || def?.p?.stats?.[defenseStatName] || def?.p?.stats?.defense) || 50;
 
       const moveType = String(mv.type || 'normal').toLowerCase();
       const attackerTypes = Array.isArray(att?.p?.types) ? att.p.types.map(t => String(t).toLowerCase()) : [];
