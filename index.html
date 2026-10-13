@@ -244,6 +244,8 @@
           sprite: data.sprites?.other?.['official-artwork']?.front_default || data.sprites?.front_default || '',
           types: data.types?.map(t => t.type.name) || [],
           stats: data.stats ? Object.fromEntries(data.stats.map(s => [s.stat.name, s.base_stat])) : {},
+          // keep move metadata (includes level-up/machine/tutor info)
+          moves: data.moves?.map(m => ({ name: m.move.name, version_group_details: m.version_group_details })) || [],
           moveNames: data.moves?.map(m => m.move.name) || []
         };
         detailCache[key] = details;
@@ -259,7 +261,7 @@
         const r = await fetch(`${API}/move/${encodeURIComponent(name)}`);
         if (!r.ok) throw new Error('move not found');
         const m = await r.json();
-        return { name: m.name, power: m.power || 40, type: m.type.name, accuracy: m.accuracy || 100, damageClass: m.damage_class.name };
+        return { name: m.name, power: m.power || 0, type: m.type.name, accuracy: m.accuracy || 100, damageClass: m.damage_class.name };
       } catch (e) {
         return { name, power: 40, type: 'normal', accuracy: 100, damageClass: 'physical' };
       }
@@ -268,16 +270,59 @@
     async function ensureMoves(p) {
       if (!p) return [];
       if (p._moves && p._moves.length) return p._moves;
-      const names = (p.moveNames || []).slice(0, 8);
-      const moves = [];
-      for (const n of names) {
-        const mv = await fetchMove(n);
-        moves.push(mv);
-        if (moves.length >= 4) break;
+
+      // Build candidate move list based on how the Pokémon can learn moves (level-up, machine (TM/HM), tutor, egg)
+      const allowedMethods = new Set(['level-up', 'machine', 'tutor', 'egg']);
+      const candidateNames = new Set();
+      for (const m of p.moves || []) {
+        const vgds = m.version_group_details || [];
+        for (const v of vgds) {
+          const method = v.move_learn_method?.name;
+          const lvl = v.level_learned_at || 0;
+          if (!method) continue;
+          if (!allowedMethods.has(method)) continue;
+          if (method === 'level-up' && lvl > 100) continue; // only level-up moves learnable by level 100
+          candidateNames.add(m.name);
+        }
       }
-      while (moves.length < 4) moves.push({ name: 'tackle', power: 40, type: 'normal', accuracy: 100, damageClass: 'physical' });
-      p._moves = moves;
-      return moves;
+
+      // Limit number of candidates to avoid excessive API calls
+      const candidates = Array.from(candidateNames).slice(0, 60);
+      const fetched = await Promise.all(candidates.map(n => fetchMove(n)));
+
+      // Prefer STAB moves, then by power
+      const types = (p.types || []).map(t => String(t).toLowerCase());
+      const withPower = fetched.map(mv => ({
+        name: mv.name,
+        power: Number(mv.power) || 0,
+        type: mv.type,
+        accuracy: mv.accuracy,
+        damageClass: mv.damageClass
+      }));
+
+      const stabMoves = withPower.filter(mv => types.includes(String(mv.type).toLowerCase()));
+      const otherMoves = withPower.filter(mv => !types.includes(String(mv.type).toLowerCase()));
+
+      stabMoves.sort((a, b) => b.power - a.power);
+      otherMoves.sort((a, b) => b.power - a.power);
+
+      const selected = [];
+      for (const mv of stabMoves) {
+        if (selected.length >= 4) break;
+        if (mv.power <= 0) continue; // skip non-damaging moves for battle selection
+        selected.push(mv);
+      }
+      for (const mv of otherMoves) {
+        if (selected.length >= 4) break;
+        if (mv.power <= 0) continue;
+        selected.push(mv);
+      }
+
+      // If still less than 4, fill with basic moves
+      while (selected.length < 4) selected.push({ name: 'tackle', power: 40, type: 'normal', accuracy: 100, damageClass: 'physical' });
+
+      p._moves = selected;
+      return selected;
     }
 
     function renderDexGrid(list) {
@@ -454,11 +499,22 @@
     }
 
     function getTypeMultiplier(moveType, defenderType) {
-      const move = String(moveType || 'normal').toLowerCase();
-      const def = String(defenderType || 'normal').toLowerCase();
+      const move = (moveType || 'normal').toLowerCase();
+      const def = (defenderType || 'normal').toLowerCase();
       const chart = TYPE_CHART[move];
       if (!chart) return 1;
       return typeof chart[def] === 'number' ? chart[def] : 1;
+    }
+
+    function getEffectiveness(moveType, defenderTypes) {
+      let multiplier = 1;
+      const details = [];
+      for (const dt of defenderTypes || []) {
+        const m = getTypeMultiplier(moveType, dt);
+        details.push({ type: dt, multiplier: m });
+        multiplier *= m;
+      }
+      return { multiplier, details };
     }
 
     function calcDamage(att, def, mv) {
@@ -491,10 +547,17 @@
       disableMoves(true);
       const me = battle.player[battle.pi];
       const foe = battle.enemy[battle.ei];
+
       const dmg = calcDamage(me, foe, mv);
+      const eff = getEffectiveness(String(mv.type || 'normal').toLowerCase(), foe.p.types || []);
+      let effectMsg = '';
+      if (eff.multiplier === 0) effectMsg = " It had no effect.";
+      else if (eff.multiplier > 1) effectMsg = " It's super effective!";
+      else if (eff.multiplier < 1) effectMsg = " It's not very effective...";
+
       foe.currentHp = Math.max(0, foe.currentHp - dmg);
       setHpFill($('foeHpFill'), foe.currentHp / foe.maxHp);
-      logBattle(`${me.p.name} used ${mv.name} and dealt ${dmg} damage!`);
+      logBattle(`${me.p.name} used ${mv.name} and dealt ${dmg} damage!${effectMsg}`);
       await new Promise(r => setTimeout(r, 700));
 
       if (foe.currentHp <= 0) {
@@ -527,9 +590,15 @@
       const moves = foe.p._moves || [];
       const mv = moves[Math.floor(Math.random() * moves.length)] || { name: 'tackle', power: 40, type: 'normal' };
       const dmg = calcDamage(foe, me, mv);
+      const eff = getEffectiveness(String(mv.type || 'normal').toLowerCase(), me.p.types || []);
+      let effectMsg = '';
+      if (eff.multiplier === 0) effectMsg = " It had no effect.";
+      else if (eff.multiplier > 1) effectMsg = " It's super effective!";
+      else if (eff.multiplier < 1) effectMsg = " It's not very effective...";
+
       me.currentHp = Math.max(0, me.currentHp - dmg);
       setHpFill($('myHpFill'), me.currentHp / me.maxHp);
-      logBattle(`${foe.p.name} used ${mv.name} and dealt ${dmg} damage!`);
+      logBattle(`${foe.p.name} used ${mv.name} and dealt ${dmg} damage!${effectMsg}`);
       await new Promise(r => setTimeout(r, 700));
 
       if (me.currentHp <= 0) {
