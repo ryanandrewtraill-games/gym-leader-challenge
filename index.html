@@ -74,6 +74,10 @@
           <h3 style="margin:6px 0">Selected team (click to remove)</h3>
           <div id="teamCards" class="dex-grid" style="grid-template-columns:repeat(3,1fr)"></div>
         </div>
+
+        <div style="margin-top:12px" class="controls">
+          <button id="continueBtn" style="background:var(--blue);color:#fff;padding:8px;border-radius:8px">Continue</button>
+        </div>
       </section>
 
       <section class="panel step-hidden" id="challengePanel">
@@ -345,15 +349,80 @@
       refreshDexDisplay();
     });
 
+    function shuffle(array){ for(let i=array.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [array[i],array[j]]=[array[j],array[i]; } return array; }
+
+    async function makeChallenge(){
+      const pool = buildDexRange('all');
+      const ids = shuffle(pool).slice(0,6);
+      challenge = { trainer: ['Blue','Red','Lance','Leaf','Giovanni','Steven'][Math.floor(Math.random()*6)], ids };
+      await Promise.all(challenge.ids.map(id => getPokemon(id)));
+      $('previewEnemy').innerHTML = challenge.ids.map(id => {
+        const p = detailCache[String(id)];
+        const sprite = p?.sprite || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+        return `
+          <div class="dex-entry" style="text-align:center">
+            <img class="mini" src="${sprite}" alt="${p?.name || '#'+id}">
+            <div style="font-weight:700">${p?.name || '#'+id}</div>
+          </div>
+        `;
+      }).join('');
+      $('challengeInfo').textContent = `Facing: ${challenge.trainer}`;
+    }
+
+    function setHpFill(el, fraction){ el.style.width = Math.max(0, Math.min(100, Math.round(fraction*100))) + '%'; }
+
+    async function startBattle(){
+      if (chosen.length !== 6) return alert('Pick 6 Pokémon first');
+      if (!challenge) await makeChallenge();
+
+      const player = [];
+      for (const id of chosen.slice(0,6)){
+        const p = await getPokemon(id);
+        player.push({ p, currentHp: 100, maxHp: 100 });
+      }
+      const enemy = [];
+      for (const id of challenge.ids.slice(0,6)){
+        const p = await getPokemon(id);
+        enemy.push({ p, currentHp: 100, maxHp: 100 });
+      }
+      battle = { player, enemy, pi: 0, ei: 0 };
+      updateBattleDisplay();
+      showStep('battle');
+      $('battleLog').textContent = `Battle start! ${challenge.trainer} vs your team.`;
+    }
+
+    function updateBattleDisplay(){
+      if (!battle) return;
+      const me = battle.player[battle.pi];
+      const foe = battle.enemy[battle.ei];
+      if (!me || !foe) return;
+      $('mySprite').src = me.p.sprite || '';
+      $('foeSprite').src = foe.p.sprite || '';
+      $('myName').textContent = me.p.name;
+      $('foeName').textContent = foe.p.name;
+      setHpFill($('myHpFill'), me.currentHp / me.maxHp);
+      setHpFill($('foeHpFill'), foe.currentHp / foe.maxHp);
+    }
+
+    $('continueBtn')?.addEventListener('click', async ()=>{
+      if (chosen.length !== 6) return alert('Choose 6 Pokémon first');
+      await makeChallenge();
+      showStep('challenge');
+    });
+
+    $('startBtn')?.addEventListener('click', async ()=>{
+      await startBattle();
+    });
+
+    $('backToTeamBtn')?.addEventListener('click', ()=> showStep('team'));
+    $('newChallengeBtn')?.addEventListener('click', async ()=>{ await makeChallenge(); showStep('challenge'); });
+
     function tick() {
       const now = new Date();
-      const end = new Date(now);
-      end.setHours(24, 0, 0, 0);
-      const diff = Math.max(0, Math.floor((end - now) / 1000));
-      const h = Math.floor(diff / 3600);
-      const m = Math.floor((diff % 3600) / 60);
-      const s = diff % 60;
-      $('countdown').textContent = [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+      const end = new Date(now); end.setHours(24,0,0,0);
+      const diff = Math.max(0, Math.floor((end-now)/1000));
+      const h = Math.floor(diff/3600); const m = Math.floor((diff%3600)/60); const s = diff%60;
+      $('countdown').textContent = [h,m,s].map(v=>String(v).padStart(2,'0')).join(':');
     }
 
     (async function init() {
@@ -362,8 +431,7 @@
       updateStatsUI();
       renderSelected();
       await refreshDexDisplay();
-      tick();
-      setInterval(tick, 1000);
+      tick(); setInterval(tick, 1000);
       showStep('team');
     })();
   </script>
