@@ -1,4 +1,912 @@
-    const typeCache = {};
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Gym Leader Challenge</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+    :root {
+      --navy:#142b3d;
+      --blue:#3279bc;
+      --green:#25a878;
+      --line:#cbdbe8;
+      --muted:#627b90;
+      --ink:#152d40;
+      --panel:#f5f9ff;
+      --health-green:#64d87a;
+      --health-yellow:#f3be57;
+      --health-red:#e65e5e;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: linear-gradient(180deg, #eff7ff 0%, #ddeaf7 100%);
+      color: var(--ink);
+    }
+
+    .top {
+      background: var(--navy);
+      color: #fff;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .ball {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(circle at 35% 30%, #fff 0 15%, #ff5a5a 15% 65%, #b30d16 100%);
+      box-shadow: inset 0 4px 10px rgba(255,255,255,.3), 0 3px 8px rgba(0,0,0,.28);
+      font-size: 22px;
+    }
+
+    .wrap {
+      max-width: 1100px;
+      margin: 18px auto;
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 16px;
+      padding: 0 12px;
+    }
+
+    .panel {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 4px 12px rgba(20, 43, 61, 0.04);
+    }
+
+    .step-hidden { display: none; }
+
+    .dex-tools {
+      display: flex;
+      gap: 8px;
+      margin: 10px 0;
+      flex-wrap: wrap;
+    }
+
+    .dex-tools input,
+    .dex-tools select,
+    .dex-tools button,
+    .controls button,
+    .move-btn,
+    .primary,
+    .secondary {
+      font: inherit;
+    }
+
+    .dex-tools input,
+    .dex-tools select,
+    .dex-tools button {
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .dex-tools input { flex: 1 1 220px; }
+
+    .dex-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 8px;
+      max-height: 420px;
+      overflow: auto;
+      padding: 6px;
+    }
+
+    .dex-entry {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px;
+      text-align: center;
+      cursor: pointer;
+      background: #fff;
+      transition: .12s ease;
+      user-select: none;
+    }
+
+    .dex-entry:hover { border-color: var(--blue); }
+    .dex-entry.selected {
+      background: #ecfbf4;
+      border-color: var(--green);
+      box-shadow: inset 0 0 0 1px rgba(37, 168, 120, 0.2);
+    }
+
+    .dex-entry .mini {
+      width: 64px;
+      height: 64px;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto 6px;
+    }
+
+    .battle-stage {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      position: relative;
+      margin-top: 12px;
+    }
+
+    .battle-scene {
+      position: relative;
+      grid-column: 1 / -1;
+      min-height: 290px;
+      padding: 16px 14px 14px;
+      border-radius: 12px;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.15), rgba(0,0,0,.02)),
+        linear-gradient(180deg, #b7dbff 0%, #9cd0ff 18%, #d9f0a3 18%, #a8d86d 100%);
+      border: 3px solid rgba(65, 92, 116, 0.6);
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.4);
+    }
+
+    .battle-scene::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.2), transparent 30%),
+        repeating-linear-gradient(
+          to bottom,
+          rgba(37, 92, 56, 0.08),
+          rgba(37, 92, 56, 0.08) 2px,
+          transparent 2px,
+          transparent 6px
+        );
+      pointer-events: none;
+    }
+
+    .battle-side {
+      position: relative;
+      z-index: 2;
+      width: 50%;
+      min-height: 170px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 8px 10px 12px;
+    }
+
+    .battle-side.player { align-items: flex-start; }
+    .battle-side.enemy { align-items: flex-end; }
+
+    .sprite-wrap {
+      width: 100%;
+      height: 185px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      transform-origin: center;
+      transition: transform .18s ease;
+    }
+
+    .sprite {
+      width: 160px;
+      height: 160px;
+      object-fit: contain;
+      filter: drop-shadow(0 8px 10px rgba(15, 25, 23, 0.26));
+      transition: transform .25s ease, filter .15s ease;
+      position: relative;
+      z-index: 2;
+    }
+
+    .battle-side.player .sprite { width: 162px; height: 162px; transform: translateY(6px); }
+    .battle-side.enemy .sprite { width: 175px; height: 175px; transform: translateY(-8px); }
+
+    .side-hud {
+      position: relative;
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: min(210px, 100%);
+      padding: 8px 10px 10px;
+      background: rgba(255,255,255,0.8);
+      border: 3px solid rgba(77, 97, 110, 0.7);
+      border-radius: 10px;
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.6);
+    }
+
+    .battle-side.enemy .side-hud { align-items: flex-end; text-align: right; }
+
+    .name-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .name-line strong { text-transform: capitalize; font-size: 0.98rem; }
+
+    .lv-tag {
+      font-size: .72rem;
+      color: var(--muted);
+      background: #eef2f6;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(98, 123, 144, 0.25);
+    }
+
+    .hp-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .72rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .hp-bar {
+      flex: 1;
+      height: 12px;
+      position: relative;
+      background: #dfe7f1;
+      border: 2px solid rgba(69, 85, 103, 0.8);
+      border-radius: 999px;
+      overflow: hidden;
+      box-shadow: inset 0 2px 0 rgba(255,255,255,.8);
+    }
+
+    .hp-fill {
+      height: 100%;
+      width: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--health-green), #3ecb6b);
+      transition: width .45s ease, background .25s ease;
+    }
+
+    .battle-log {
+      margin-top: 12px;
+      background: linear-gradient(180deg, #f4f7fb, #edf3f9);
+      border: 3px solid rgba(76, 93, 107, .75);
+      border-radius: 12px;
+      min-height: 72px;
+      padding: 10px 12px;
+      color: var(--ink);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      line-height: 1.6;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .move-btn, .controls button {
+      border: 2px solid rgba(76, 93, 107, .8);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform .08s ease, filter .12s ease, opacity .12s ease;
+      font-weight: 700;
+      box-shadow: 0 3px 0 rgba(19, 36, 55, 0.2);
+    }
+
+    .move-btn:hover, .controls button:hover { filter: brightness(1.02); }
+    .move-btn:active, .controls button:active { transform: translateY(1px); }
+
+    .moves {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .move-btn {
+      background: linear-gradient(180deg, #f6fbff, #e9f0ff);
+      color: var(--ink);
+      min-height: 54px;
+      padding: 10px 12px;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 3px;
+      position: relative;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .move-btn strong {
+      text-transform: capitalize;
+      font-size: 0.92rem;
+      letter-spacing: 0.015em;
+    }
+
+    .move-btn small {
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 10px;
+      letter-spacing: 0.04em;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .controls button {
+      padding: 10px 14px;
+      background: linear-gradient(180deg, #f7f9fc, #e7edf7);
+      color: var(--ink);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .primary {
+      background: linear-gradient(180deg, #4e94dc, #2d6cba) !important;
+      color: #fff !important;
+      border-color: rgba(20, 55, 100, .85) !important;
+      box-shadow: 0 3px 0 rgba(20, 55, 100, .45) !important;
+    }
+
+    .secondary {
+      background: linear-gradient(180deg, #fafbfd, #ecf1f7) !important;
+    }
+
+    .disabled {
+      opacity: .5;
+      pointer-events: none;
+      filter: grayscale(.15);
+    }
+
+    .switch-panel {
+      position: absolute;
+      left: 50%;
+      top: 56%;
+      transform: translate(-50%, 0);
+      width: min(520px, 88%);
+      background: rgba(245, 249, 255, 0.96);
+      border: 3px solid rgba(76, 93, 107, .8);
+      border-radius: 12px;
+      padding: 12px 12px 10px;
+      z-index: 50;
+      box-shadow: 0 12px 24px rgba(20, 43, 61, .18);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      text-transform: uppercase;
+    }
+
+    .switch-grid {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .switch-slot {
+      width: 90px;
+      text-align: center;
+      border: 2px solid rgba(76, 93, 107, .7);
+      padding: 6px 4px 7px;
+      border-radius: 10px;
+      cursor: pointer;
+      background: linear-gradient(180deg, #fff, #edf3ff);
+      transition: transform .08s ease, border-color .12s ease;
+    }
+
+    .switch-slot:hover { border-color: var(--blue); }
+    .switch-slot:active { transform: translateY(1px); }
+    .switch-slot.disabled { opacity: .5; pointer-events: none; }
+
+    .switch-slot img {
+      width: 56px;
+      height: 56px;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto 6px;
+    }
+
+    .switch-slot .label {
+      font-weight: 700;
+      text-transform: capitalize;
+      font-size: .76rem;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .switch-slot .hp-mini {
+      font-size: .68rem;
+      color: var(--muted);
+      line-height: 1.2;
+      margin-top: 4px;
+    }
+
+    .damage-pop {
+      position: absolute;
+      font-weight: 900;
+      font-size: 1.8rem;
+      color: #e74d4d;
+      text-shadow: 2px 2px 0 rgba(0,0,0,.18);
+      animation: popUp .8s ease forwards;
+      pointer-events: none;
+      z-index: 30;
+    }
+
+    .shake { animation: shake .42s ease-in-out; }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-8px) rotate(-2deg); }
+      40% { transform: translateX(8px) rotate(2deg); }
+      60% { transform: translateX(-6px) rotate(-1deg); }
+      80% { transform: translateX(6px) rotate(1deg); }
+    }
+
+    @keyframes popUp {
+      0% { opacity: 0; transform: translate(-50%, 12px) scale(.8); }
+      25% { opacity: 1; }
+      100% { opacity: 0; transform: translate(-50%, -28px) scale(1.1); }
+    }
+
+    @media(max-width:900px) {
+      .wrap { grid-template-columns: 1fr; }
+      .battle-stage { grid-template-columns: 1fr; }
+      .battle-side { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <div class="ball">🔴</div>
+      <div>
+        <h1 style="margin:0;font-size:1.2rem">Gym Leader Challenge</h1>
+        <div style="color:#dfeaf7;font-size:0.9rem">Pick your six. Defend your Gym. Face the challenge.</div>
+      </div>
+    </div>
+    <div id="countdown">--:--:--</div>
+  </header>
+
+  <div class="wrap">
+    <main>
+      <section class="panel" id="teamBuilder">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div>
+            <h2 style="margin:0">🧩 Team Builder</h2>
+            <div id="teamNote" style="color:var(--muted)">Pick your six.</div>
+          </div>
+        </div>
+
+        <div class="dex-tools">
+          <input id="dexSearch" placeholder="Type name or ID and press Enter or Search" aria-label="Search Pokémon">
+          <select id="genFilter" aria-label="Filter by generation">
+            <option value="all">All Gen I–III</option>
+            <option value="1">Gen I</option>
+            <option value="2">Gen II</option>
+            <option value="3">Gen III</option>
+          </select>
+          <button id="dexSearchBtn" type="button">Search</button>
+          <button id="clearDexBtn" type="button">Clear</button>
+        </div>
+
+        <div id="dexGrid" class="dex-grid"></div>
+
+        <div style="margin-top:12px">
+          <h3 style="margin:6px 0">Selected team (click to remove)</h3>
+          <div style="margin:6px 0;color:var(--muted);font-weight:700" id="teamCount">0/6 selected</div>
+          <div id="teamCards" class="dex-grid" style="grid-template-columns:repeat(3,1fr)"></div>
+        </div>
+
+        <div style="margin-top:12px" class="controls">
+          <button id="continueBtn" class="primary" style="opacity:0.5;cursor:not-allowed" disabled type="button">Continue</button>
+        </div>
+      </section>
+
+      <section class="panel step-hidden" id="challengePanel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h2 style="margin:0">⚔️ Challenger</h2>
+          <div><button id="startBtn" class="primary" type="button">Start</button></div>
+        </div>
+        <div id="challengeInfo" style="color:var(--muted);margin-bottom:8px">Your challenge is ready.</div>
+        <div id="previewEnemy" class="dex-grid"></div>
+      </section>
+
+      <section class="panel step-hidden" id="battlePanel">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h2 style="margin:0">🥊 Battle</h2>
+          <div id="battleRound" style="color:var(--muted)"></div>
+        </div>
+
+        <div class="battle-stage" style="margin-top:12px;position:relative">
+          <div class="battle-scene">
+            <div class="battle-side player">
+              <div class="sprite-wrap" id="mySpriteWrap">
+                <img id="mySprite" class="sprite" src="" alt="">
+              </div>
+              <div class="side-hud">
+                <div class="name-line">
+                  <strong id="myName">Pikachu</strong>
+                  <span class="lv-tag">Lv 50</span>
+                </div>
+                <div class="hp-box">
+                  <span>HP</span>
+                  <div class="hp-bar"><div id="myHpFill" class="hp-fill"></div></div>
+                  <span id="myHpText">100 / 100</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="battle-side enemy">
+              <div class="sprite-wrap" id="foeSpriteWrap">
+                <img id="foeSprite" class="sprite" src="" alt="">
+              </div>
+              <div class="side-hud">
+                <div class="name-line">
+                  <strong id="foeName">Charizard</strong>
+                  <span class="lv-tag">Lv 50</span>
+                </div>
+                <div class="hp-box">
+                  <span>HP</span>
+                  <div class="hp-bar"><div id="foeHpFill" class="hp-fill"></div></div>
+                  <span id="foeHpText">100 / 100</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="ground"></div>
+          </div>
+
+          <div id="switchPanel" class="step-hidden switch-panel"></div>
+        </div>
+
+        <div class="moves" id="moveButtons"></div>
+        <div style="margin-top:6px" class="controls">
+          <button id="switchBtn" class="secondary" type="button">Switch</button>
+        </div>
+        <div class="battle-log" id="battleLog">Battle messages appear here.</div>
+      </section>
+
+      <section class="panel step-hidden" id="resultPanel">
+        <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">🏆 Results</h2></div>
+        <div id="resultSummary" class="battle-log"></div>
+        <div style="margin-top:8px" class="controls">
+          <button id="newChallengeBtn" class="primary" type="button">Play again</button>
+          <button id="backToTeamBtn" class="secondary" type="button">Back to team</button>
+        </div>
+      </section>
+    </main>
+
+    <aside>
+      <section class="panel">
+        <h3 style="margin:0 0 8px 0">📊 Daily Stats</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div style="background:#f6fbff;padding:8px;border-radius:8px">
+            <small style="color:var(--muted)">Wins</small>
+            <div id="wins">0</div>
+          </div>
+          <div style="background:#f6fbff;padding:8px;border-radius:8px">
+            <small style="color:var(--muted)">Losses</small>
+            <div id="losses">0</div>
+          </div>
+        </div>
+        <div style="margin-top:8px;color:var(--muted)" id="dailyStatus">Testing mode: daily lock off</div>
+      </section>
+    </aside>
+  </div>
+
+  <script>
+    const API = 'https://pokeapi.co/api/v2';
+    const $ = (id) => document.getElementById(id);
+
+    function safeParse(v, fallback) {
+      if (v === null || v === '') return fallback;
+      try { return JSON.parse(v); } catch (e) { return fallback; }
+    }
+
+    const storageKeyTeam = 'gymTeam';
+    let chosen = safeParse(localStorage.getItem(storageKeyTeam), []);
+    let detailCache = {};
+    let challenge = null;
+    let battle = null;
+    let moveLock = false;
+    let turnBusy = false;
+    let battleMessageTimer = null;
+    let typeCache = {};
+
+    function saveTeam() {
+      localStorage.setItem(storageKeyTeam, JSON.stringify(chosen));
+    }
+
+    function normalizeChoiceList(list) {
+      const arr = Array.isArray(list) ? list : [];
+      return arr.map(Number).filter((v, i, a) => Number.isFinite(v) && a.indexOf(v) === i).slice(0, 6);
+    }
+
+    function showStep(step) {
+      const states = {
+        team: ['teamBuilder'],
+        challenge: ['teamBuilder', 'challengePanel'],
+        battle: ['battlePanel'],
+        result: ['resultPanel']
+      };
+      const visible = new Set(states[step] || []);
+      ['teamBuilder', 'challengePanel', 'battlePanel', 'resultPanel'].forEach((id) => {
+        const el = $(id);
+        if (el) el.classList.toggle('step-hidden', !visible.has(id));
+      });
+    }
+
+    function resetBattleState() {
+      battle = null;
+      moveLock = false;
+      turnBusy = false;
+      hideSwitchPanel();
+      const moveButtons = $('moveButtons');
+      if (moveButtons) moveButtons.innerHTML = '';
+      logBattle('Battle messages appear here.');
+      const myHpFill = $('myHpFill');
+      const foeHpFill = $('foeHpFill');
+      if (myHpFill) myHpFill.style.width = '100%';
+      if (foeHpFill) foeHpFill.style.width = '100%';
+      const myHpText = $('myHpText');
+      const foeHpText = $('foeHpText');
+      if (myHpText) myHpText.textContent = '100 / 100';
+      if (foeHpText) foeHpText.textContent = '100 / 100';
+      const battleRound = $('battleRound');
+      if (battleRound) battleRound.textContent = '';
+      const mySprite = $('mySprite');
+      const foeSprite = $('foeSprite');
+      if (mySprite) mySprite.src = '';
+      if (foeSprite) foeSprite.src = '';
+    }
+
+    function buildDexRange(gen) {
+      if (gen === '1') return Array.from({ length: 151 }, (_, i) => i + 1);
+      if (gen === '2') return Array.from({ length: 100 }, (_, i) => i + 152);
+      if (gen === '3') return Array.from({ length: 135 }, (_, i) => i + 252);
+      return Array.from({ length: 386 }, (_, i) => i + 1);
+    }
+
+    function updateTeamCount() {
+      const count = chosen.length;
+      $('teamCount').textContent = `${count}/6 selected`;
+      const btn = $('continueBtn');
+      const isReady = count === 6;
+      btn.disabled = !isReady;
+      btn.style.opacity = isReady ? '1' : '0.5';
+      btn.style.cursor = isReady ? 'pointer' : 'not-allowed';
+    }
+
+    async function getPokemon(idOrName) {
+      const key = String(idOrName).toLowerCase();
+      if (detailCache[key]) return detailCache[key];
+      const lookup = Number(idOrName) || idOrName;
+      try {
+        const res = await fetch(`${API}/pokemon/${lookup}`);
+        if (!res.ok) throw new Error('Not found');
+        const data = await res.json();
+        const details = {
+          id: data.id,
+          name: data.name,
+          sprite: data.sprites?.other?.['official-artwork']?.front_default || data.sprites?.front_default || '',
+          spritePixel: data.sprites?.front_default || '',
+          types: data.types?.map(t => t.type.name) || [],
+          stats: data.stats ? Object.fromEntries(data.stats.map(s => [s.stat.name, s.base_stat])) : {},
+          moveNames: data.moves?.map(m => m.move.name) || []
+        };
+        detailCache[key] = details;
+        detailCache[String(data.id)] = details;
+        return details;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    async function fetchMove(name) {
+      try {
+        const r = await fetch(`${API}/move/${encodeURIComponent(name)}`);
+        if (!r.ok) throw new Error('move not found');
+        const m = await r.json();
+        return { name: m.name, power: m.power || 40, type: m.type.name, accuracy: m.accuracy || 100, damageClass: m.damage_class.name };
+      } catch (e) {
+        return { name: name || 'tackle', power: 40, type: 'normal', accuracy: 100, damageClass: 'physical' };
+      }
+    }
+
+    async function ensureMoves(p) {
+      if (!p) return [];
+      if (p._moves && p._moves.length) return p._moves;
+      const names = (p.moveNames || []).slice(0, 8);
+      const moves = [];
+      for (const n of names) {
+        const mv = await fetchMove(n);
+        moves.push(mv);
+        if (moves.length >= 4) break;
+      }
+      while (moves.length < 4) {
+        moves.push({ name: 'tackle', power: 40, type: 'normal', accuracy: 100, damageClass: 'physical' });
+      }
+      p._moves = moves;
+      return moves;
+    }
+
+    function renderDexGrid(list) {
+      const items = list || [];
+      const grid = $('dexGrid');
+      grid.innerHTML = items.map((id) => {
+        const p = detailCache[String(id)] || null;
+        const selected = chosen.includes(Number(id));
+        const sprite = p?.sprite || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+        return `
+          <div class="dex-entry ${selected ? 'selected' : ''}" data-id="${id}">
+            <img class="mini" src="${sprite}" alt="${p?.name || 'Pokémon'}">
+            <div style="font-weight:700">#${id}</div>
+            <small style="color:var(--muted)">${p ? p.name : 'Loading...'}</small>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderSelected() {
+      const team = Array.from({ length: 6 }, (_, i) => chosen[i] || null);
+      const cards = $('teamCards');
+      cards.innerHTML = team.map((id) => {
+        if (!id) return '<div class="dex-entry" style="opacity:0.6">Empty</div>';
+        const p = detailCache[String(id)] || null;
+        const sprite = p?.sprite || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+        return `
+          <div class="dex-entry selected" data-id="${id}">
+            <img class="mini" src="${sprite}" alt="${p?.name || 'Pokémon'}">
+            <div style="font-weight:700">${p ? p.name : `#${id}`}</div>
+          </div>
+        `;
+      }).join('');
+      updateTeamCount();
+    }
+
+    async function refreshDexDisplay() {
+      const gen = $('genFilter').value || 'all';
+      const q = $('dexSearch').value.trim().toLowerCase();
+      let list = buildDexRange(gen);
+
+      if (q) {
+        const matches = [];
+        for (const id of list) {
+          const p = await getPokemon(id);
+          if (!p) continue;
+          const text = `${p.name} ${id}`.toLowerCase();
+          if (text.includes(q)) matches.push(id);
+        }
+        list = matches;
+      }
+
+      renderDexGrid(list);
+    }
+
+    function toggleSelected(id) {
+      const num = Number(id);
+      if (!Number.isFinite(num)) return;
+      if (chosen.includes(num)) {
+        chosen = chosen.filter((x) => x !== num);
+      } else {
+        if (chosen.length >= 6) {
+          alert('Your team is full — click a selected Pokémon to remove it first.');
+          return;
+        }
+        chosen.push(num);
+      }
+      saveTeam();
+      renderSelected();
+      renderDexGrid(buildDexRange($('genFilter').value || 'all'));
+    }
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    async function makeChallenge() {
+      const pool = buildDexRange('all');
+      const ids = shuffle(pool).slice(0, 6);
+      challenge = {
+        trainer: ['Blue', 'Red', 'Lance', 'Leaf', 'Giovanni', 'Steven'][Math.floor(Math.random() * 6)],
+        ids
+      };
+      await Promise.all(challenge.ids.map(id => getPokemon(id)));
+      $('previewEnemy').innerHTML = challenge.ids.map((id) => {
+        const p = detailCache[String(id)];
+        const sprite = p?.sprite || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+        return `
+          <div class="dex-entry" style="text-align:center">
+            <img class="mini" src="${sprite}" alt="${p?.name || '#' + id}">
+            <div style="font-weight:700">${p?.name || '#' + id}</div>
+          </div>
+        `;
+      }).join('');
+      $('challengeInfo').textContent = `Facing: ${challenge.trainer}`;
+    }
+
+    function setHpFill(el, fraction, colorMode = 'normal') {
+      const pct = Math.max(0, Math.min(100, Math.round(fraction * 100)));
+      el.style.width = pct + '%';
+      if (colorMode === 'health') {
+        let color = 'linear-gradient(90deg, var(--health-green), #3ecb6b)';
+        if (pct <= 50) color = 'linear-gradient(90deg, var(--health-yellow), #f3be57)';
+        if (pct <= 20) color = 'linear-gradient(90deg, var(--health-red), #e65e5e)';
+        el.style.background = color;
+      }
+    }
+
+    function logBattle(msg) {
+      const el = $('battleLog');
+      if (!el) return;
+      clearTimeout(battleMessageTimer);
+      el.textContent = '';
+      let i = 0;
+      const type = () => {
+        el.textContent = msg.slice(0, i);
+        i += 1;
+        if (i <= msg.length) {
+          battleMessageTimer = setTimeout(type, 18);
+        }
+      };
+      type();
+    }
+
+    function setHpText(id, current, max) {
+      const el = $(id);
+      if (el) el.textContent = `${Math.max(0, current)} / ${max}`;
+    }
+
+    function animateHit(targetId, amount = '-') {
+      const node = $(targetId);
+      if (!node) return;
+      node.classList.remove('shake');
+      void node.offsetWidth;
+      node.classList.add('shake');
+
+      const dmg = document.createElement('div');
+      dmg.className = 'damage-pop';
+      dmg.textContent = `-${amount}`;
+
+      const battleSide = node.closest('.battle-side');
+      if (battleSide) {
+        const spriteWrap = battleSide.querySelector('.sprite-wrap');
+        if (spriteWrap) {
+          const rect = spriteWrap.getBoundingClientRect();
+          dmg.style.left = rect.left + rect.width / 2 + 'px';
+          dmg.style.top = rect.top + rect.height / 2 + 'px';
+        }
+      }
+
+      document.body.appendChild(dmg);
+      setTimeout(() => dmg.remove(), 800);
+    }
 
     async function getTypeData(typeName) {
       if (!typeName) return null;
@@ -19,6 +927,7 @@
       if (!moveType || !defenderTypes.length) return 1;
       const typeData = await getTypeData(moveType);
       if (!typeData) return 1;
+
       const rel = typeData.damage_relations || {};
       const doubleDamageTo = (rel.double_damage_to || []).map(t => t.name);
       const halfDamageTo = (rel.half_damage_to || []).map(t => t.name);
@@ -45,7 +954,41 @@
       return Math.max(1, Math.floor(raw / 10));
     }
 
-    async function renderMoveButtons() {
+    function setupBattleUI() {
+      if (!battle) return;
+      const me = battle.player[battle.pi];
+      const foe = battle.enemy[battle.ei];
+      if (!me || !foe) return;
+
+      $('mySprite').src = me.p.sprite || me.p.spritePixel || '';
+      $('foeSprite').src = foe.p.sprite || foe.p.spritePixel || '';
+      $('myName').textContent = me.p.name;
+      $('foeName').textContent = foe.p.name;
+      setHpFill($('myHpFill'), me.currentHp / me.maxHp, 'health');
+      setHpFill($('foeHpFill'), foe.currentHp / foe.maxHp, 'health');
+      setHpText('myHpText', me.currentHp, me.maxHp);
+      setHpText('foeHpText', foe.currentHp, foe.maxHp);
+      $('battleRound').textContent = `Round ${battle.round}`;
+      renderMoveButtons();
+      renderSwitchButton();
+      hideSwitchPanel();
+    }
+
+    function disableMoves(val) {
+      moveLock = val;
+      const btns = Array.from(document.querySelectorAll('#moveButtons .move-btn'));
+      btns.forEach((b) => {
+        b.disabled = val;
+        b.classList.toggle('disabled', val);
+      });
+      const sbtn = $('switchBtn');
+      if (sbtn) {
+        sbtn.disabled = val;
+        sbtn.classList.toggle('disabled', val);
+      }
+    }
+
+    function renderMoveButtons() {
       const container = $('moveButtons');
       container.innerHTML = '';
       if (!battle) return;
@@ -64,13 +1007,39 @@
       }
     }
 
-    function calcDamage(att, def, mv) {
-      const power = mv.power || 40;
-      const atk = att.p.stats.attack || 50;
-      const defStat = def.p.stats.defense || 50;
-      const base = Math.max(1, Math.floor(power * (atk / Math.max(1, defStat))));
-      const rand = 0.85 + Math.random() * 0.3;
-      return Math.max(1, Math.floor(base * rand / 10));
+    function renderSwitchButton() {
+      const btn = $('switchBtn');
+      if (!btn) return;
+      btn.disabled = !battle || moveLock || turnBusy;
+      btn.classList.toggle('disabled', !battle || moveLock || turnBusy);
+    }
+
+    function renderSwitchPanel() {
+      const panel = $('switchPanel');
+      if (!battle || !panel) return;
+      const players = battle.player;
+      panel.innerHTML = `
+        <div style="font-weight:700;text-align:center;margin-bottom:8px">Choose a Pokémon to switch</div>
+        <div class="switch-grid">
+          ${players.map((slot, idx) => {
+            const hpPct = Math.round((slot.currentHp / slot.maxHp) * 100);
+            const disabled = idx === battle.pi || slot.currentHp <= 0;
+            return `
+              <div class="switch-slot ${disabled ? 'disabled' : ''}" data-index="${idx}">
+                <img src="${slot.p.sprite || slot.p.spritePixel || ''}" alt="${slot.p.name}">
+                <div class="label">${slot.p.name}</div>
+                <div class="hp-mini">${slot.currentHp <= 0 ? 'Fainted' : `${hpPct}% HP`}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+      panel.classList.remove('step-hidden');
+    }
+
+    function hideSwitchPanel() {
+      const panel = $('switchPanel');
+      if (panel) panel.classList.add('step-hidden');
     }
 
     async function playerUseMove(mv) {
@@ -112,3 +1081,174 @@
       turnBusy = false;
       await enemyTurn();
     }
+
+    async function enemyTurn() {
+      if (!battle || turnBusy) return;
+      turnBusy = true;
+      const me = battle.player[battle.pi];
+      const foe = battle.enemy[battle.ei];
+      if (!me || !foe) return;
+
+      const moves = foe.p._moves || [];
+      const mv = moves[Math.floor(Math.random() * moves.length)] || { name: 'tackle', power: 40, type: 'normal' };
+      const dmg = await calcDamage(foe, me, mv);
+      me.currentHp = Math.max(0, me.currentHp - dmg);
+      setHpFill($('myHpFill'), me.currentHp / me.maxHp, 'health');
+      setHpText('myHpText', me.currentHp, me.maxHp);
+      logBattle(`${foe.p.name} used ${mv.name} and dealt ${dmg} damage!`);
+      animateHit('mySprite', dmg);
+      await new Promise(r => setTimeout(r, 700));
+
+      if (me.currentHp <= 0) {
+        logBattle(`${me.p.name} fainted!`);
+        await new Promise(r => setTimeout(r, 600));
+        battle.pi += 1;
+        if (battle.pi >= battle.player.length) {
+          logBattle(`You were defeated by ${challenge.trainer}...`);
+          showResult(false);
+          return;
+        }
+        const next = battle.player[battle.pi];
+        next.currentHp = next.maxHp;
+        setupBattleUI();
+        disableMoves(false);
+        turnBusy = false;
+        return;
+      }
+
+      battle.round += 1;
+      setupBattleUI();
+      disableMoves(false);
+      turnBusy = false;
+    }
+
+    function showResult(playerWon) {
+      $('resultSummary').textContent = playerWon ? 'Victory!' : 'Defeat.';
+      showStep('result');
+      battle = null;
+      turnBusy = false;
+      disableMoves(false);
+    }
+
+    async function attemptSwitch(targetIndex) {
+      if (moveLock || turnBusy || !battle) return;
+      if (targetIndex === battle.pi) return;
+      const target = battle.player[targetIndex];
+      if (!target || target.currentHp <= 0) {
+        alert('Cannot switch to a fainted Pokémon.');
+        return;
+      }
+      disableMoves(true);
+      turnBusy = true;
+      logBattle(`Switching to ${target.p.name}...`);
+      await new Promise(r => setTimeout(r, 350));
+      battle.pi = targetIndex;
+      setupBattleUI();
+      await new Promise(r => setTimeout(r, 300));
+      await enemyTurn();
+      disableMoves(false);
+      turnBusy = false;
+    }
+
+    async function startBattle() {
+      if (chosen.length !== 6) {
+        alert('Choose 6 Pokémon first');
+        return;
+      }
+      if (!challenge) await makeChallenge();
+      const player = [];
+      for (const id of chosen) {
+        const p = await getPokemon(id);
+        await ensureMoves(p);
+        player.push({ p, currentHp: 100, maxHp: 100 });
+      }
+      const enemy = [];
+      for (const id of challenge.ids) {
+        const p = await getPokemon(id);
+        await ensureMoves(p);
+        enemy.push({ p, currentHp: 100, maxHp: 100 });
+      }
+      battle = { player, enemy, pi: 0, ei: 0, round: 1 };
+      setupBattleUI();
+      showStep('battle');
+      logBattle(`Battle start! ${challenge.trainer} is ready.`);
+    }
+
+    document.addEventListener('click', async (event) => {
+      const dexSlot = event.target.closest('.dex-entry[data-id]');
+      if (dexSlot) {
+        const id = Number(dexSlot.dataset.id);
+        if (Number.isFinite(id)) {
+          toggleSelected(id);
+          return;
+        }
+      }
+
+      const switchSlot = event.target.closest('.switch-slot[data-index]');
+      if (switchSlot) {
+        const idx = Number(switchSlot.dataset.index);
+        if (Number.isFinite(idx)) {
+          await attemptSwitch(idx);
+          hideSwitchPanel();
+          return;
+        }
+      }
+    });
+
+    $('dexSearchBtn').addEventListener('click', refreshDexDisplay);
+    $('dexSearch').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') refreshDexDisplay();
+    });
+    $('genFilter').addEventListener('change', refreshDexDisplay);
+    $('clearDexBtn').addEventListener('click', () => {
+      $('dexSearch').value = '';
+      $('genFilter').value = 'all';
+      refreshDexDisplay();
+    });
+    $('continueBtn').addEventListener('click', async () => {
+      if (chosen.length !== 6) {
+        alert('Choose 6 Pokémon first');
+        return;
+      }
+      await makeChallenge();
+      showStep('challenge');
+    });
+    $('startBtn').addEventListener('click', async () => {
+      await startBattle();
+    });
+    $('switchBtn').addEventListener('click', () => {
+      if (!battle || moveLock || turnBusy) return;
+      renderSwitchPanel();
+    });
+    $('backToTeamBtn').addEventListener('click', () => {
+      resetBattleState();
+      showStep('team');
+    });
+    $('newChallengeBtn').addEventListener('click', async () => {
+      resetBattleState();
+      await makeChallenge();
+      showStep('challenge');
+    });
+
+    function tick() {
+      const now = new Date();
+      const end = new Date(now);
+      end.setHours(24, 0, 0, 0);
+      const diff = Math.max(0, end - now);
+      const h = String(Math.floor(diff / (1000 * 60 * 60))).padStart(2, '0');
+      const m = String(Math.floor((diff / (1000 * 60)) % 60)).padStart(2, '0');
+      const s = String(Math.floor((diff / 1000) % 60)).padStart(2, '0');
+      $('countdown').textContent = `${h}:${m}:${s}`;
+    }
+
+    (async function init() {
+      chosen = normalizeChoiceList(chosen);
+      renderSelected();
+      await refreshDexDisplay();
+      tick();
+      setInterval(tick, 1000);
+      showStep('team');
+    })();
+  </script>
+</body>
+</html>
